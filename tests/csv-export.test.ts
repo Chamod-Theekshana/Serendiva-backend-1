@@ -103,7 +103,7 @@ describe('admin CSV exports', () => {
   })
 
   it('export filters match the list filters', async () => {
-    const none = await ctx.app.inject({ method: 'GET', url: '/api/v1/admin/inquiries/export.csv?status=closed', cookies: session.cookies })
+    const none = await ctx.app.inject({ method: 'GET', url: '/api/v1/admin/inquiries/export.csv?status=lost', cookies: session.cookies })
     expect(parseCsv(none.body)).toHaveLength(1) // header only
   })
 

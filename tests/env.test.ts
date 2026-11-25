@@ -10,9 +10,10 @@ describe('environment validation', () => {
   })
 
   it('parses lists, booleans and defaults', () => {
-    const env = load({ CORS_ORIGINS: 'https://a.example, https://b.example,,', EMAIL_RETRY_DISABLED: '1', PORT: '8080' })
+    const env = load({ CORS_ORIGINS: 'https://a.example, https://b.example,,', EMAIL_RETRY_DISABLED: '1', DOCS_ENABLED: 'true', PORT: '8080' })
     expect(env.CORS_ORIGINS).toEqual(['https://a.example', 'https://b.example'])
     expect(env.EMAIL_RETRY_DISABLED).toBe(true)
+    expect(env.DOCS_ENABLED).toBe(true)
     expect(env.PORT).toBe(8080)
     expect(env.COOKIE_DOMAIN).toBeUndefined()
     expect(env.TURNSTILE_SECRET).toBeUndefined()
@@ -41,5 +42,22 @@ describe('environment validation', () => {
     expect(exit).toHaveBeenCalledWith(1)
     const output = String(error.mock.calls[0]?.[0])
     for (const key of ['JWT_ACCESS_SECRET', 'COOKIE_SECURE', 'S3_BUCKET', 'RESEND_API_KEY']) expect(output).toContain(key)
+  })
+
+  it('EMAIL_DRIVER=smtp needs SMTP_USER and SMTP_PASSWORD and defaults to Gmail over TLS', () => {
+    const smtp = load({ EMAIL_DRIVER: 'smtp', SMTP_USER: 'me@gmail.com', SMTP_PASSWORD: 'abcd efgh ijkl mnop' })
+    expect(smtp).toMatchObject({ SMTP_HOST: 'smtp.gmail.com', SMTP_PORT: 465, SMTP_SECURE: true })
+    expect(load({ EMAIL_DRIVER: 'smtp', SMTP_USER: 'u', SMTP_PASSWORD: 'p', SMTP_PORT: '587', SMTP_SECURE: 'false' })).toMatchObject({
+      SMTP_PORT: 587,
+      SMTP_SECURE: false,
+    })
+
+    vi.spyOn(process, 'exit').mockImplementation((() => {
+      throw new Error('process.exit')
+    }) as never)
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    expect(() => load({ EMAIL_DRIVER: 'smtp' })).toThrow('process.exit')
+    const output = String(error.mock.calls[0]?.[0])
+    for (const key of ['SMTP_USER', 'SMTP_PASSWORD']) expect(output).toContain(key)
   })
 })

@@ -230,9 +230,11 @@ problem and exits. Booleans accept `true`/`false`/`1`/`0`.
 | `COOKIE_SECURE` | `auto` | `auto` = Secure in production only; `true` / `false` |
 | `COOKIE_SAMESITE` | `lax` | `lax`, `strict` or `none` (`none` requires Secure) |
 | `ADMIN_SEED_EMAIL` / `ADMIN_SEED_PASSWORD` / `ADMIN_SEED_NAME` | — | First admin, created by `npm run db:seed` (password 10+ chars) **[PLACEHOLDER]** |
-| `EMAIL_DRIVER` | `console` | `console` (writes `tmp/emails/*.html`, development) or `resend` |
+| `EMAIL_DRIVER` | `console` | `console` (writes `tmp/emails/*.html`, development), `resend` (needs a verified domain) or `smtp` (e.g. Gmail, no domain needed) |
 | `RESEND_API_KEY` | — | Required when `EMAIL_DRIVER=resend` |
-| `MAIL_FROM` | `Serendiva <hello@serendiva.lk>` | Sender; must be on a domain verified in Resend **[PLACEHOLDER]** |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` | `smtp.gmail.com` / `465` / `true` | SMTP server (`SMTP_SECURE=false` with port `587`) |
+| `SMTP_USER` / `SMTP_PASSWORD` | — | Required when `EMAIL_DRIVER=smtp`. Gmail: the address and an **App Password** (spaces are ignored) |
+| `MAIL_FROM` | `Serendiva <hello@serendiva.lk>` | Sender; with Resend on the verified domain, with Gmail the `SMTP_USER` address **[PLACEHOLDER]** |
 | `GUIDE_NOTIFY_EMAIL` | `guide@serendiva.lk` | Receives inquiry and proposal notifications **[PLACEHOLDER]** |
 | `STORAGE_DRIVER` | `local` | `local` (folder `UPLOAD_DIR`, served at `/uploads`) or `s3` (AWS S3 / Cloudflare R2) |
 | `UPLOAD_DIR` | `uploads` | Folder for the local driver |
@@ -241,6 +243,7 @@ problem and exits. Booleans accept `true`/`false`/`1`/`0`.
 | `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | — | Required when `STORAGE_DRIVER=s3` |
 | `S3_PUBLIC_URL` | — | Public base URL of the bucket (custom domain / CDN), required with `s3` |
 | `FORM_RATE_LIMIT` | `5` | Form submissions per IP per minute (inquiry, proposal, newsletter, review) |
+| `VISITOR_EMAILS_PER_ADDRESS_PER_DAY` / `VISITOR_EMAILS_PER_DAY` | `3` / `150` | Anti-spam for inquiry confirmations (they go to any typed address through your mailbox): over either limit in 24 h the inquiry is saved and you are notified, but no confirmation is sent |
 | `TURNSTILE_SECRET` | *(empty = off)* | Cloudflare Turnstile secret; when set, forms must send `turnstileToken` |
 | `EMAIL_RETRY_INTERVAL_MINUTES` | `10` | How often failed lead emails are retried |
 | `EMAIL_RETRY_DISABLED` | `false` | Turn the retry job off |
@@ -355,6 +358,7 @@ restrictions**. Do not use this; use option A.
 | `GET /api/v1/blog`, `/blog/{slug}` | Blog list (category, tag, search) and post |
 | `GET /api/v1/gallery`, `/availability` | Gallery items; the guide's busy/available ranges |
 | `GET /api/v1/settings/public` | Contact details, guide profile, counters, hero slides, SEO defaults (defaults on an empty database) |
+| `GET /api/v1/page-content/public` | Admin overrides of the website's static page copy (English + the requested locale); empty by default |
 | `POST /api/v1/inquiries` | Travel inquiry (JSON) → `201 { reference, message }` |
 | `POST /api/v1/corporate-proposals` | Corporate request (multipart, optional PDF/DOCX ≤ 5 MB) |
 | `POST /api/v1/newsletter/subscribe`, `GET /newsletter/confirm?token=`, `GET /newsletter/unsubscribe?token=` | Double opt-in newsletter |
@@ -371,6 +375,7 @@ Content endpoints accept `?locale=en|zh|de` (default `en`, English fallback per 
 | Leads | `inquiries`, `proposals`: list (status, date range, search, pagination, status counts), detail, `PATCH` (status, internal notes), `DELETE`, `GET /export.csv`, `POST /{id}/resend-emails`; `GET /proposals/{id}/attachment`; `newsletter`: list, CSV export, delete |
 | Media | `GET /media`, `GET /media/{id}` (with usage), `POST /media` (multipart, 1–20 files), `PATCH /media/{id}` (alt text), `DELETE /media/{id}` (`409 MEDIA_IN_USE` while referenced) |
 | Settings | `GET /settings`, `PUT /settings/{contact,social,guide,counters,trustBadges,heroSlides,seo,corporateClients,instagramFeed,pageImages}` |
+| Page content | `GET /page-content`, `PUT /page-content/{namespace}` (`{ values: { "<message.path>": "text" }, hidden: ["<section>"], lists: { "<list.path>": [{ key, values }] } }`, replaces that namespace's overrides; revalidates `page-content`) |
 | Stats | `GET /stats` (inquiries this week/month, by status with conversion rate, by month, country, tour and source page; latest inquiries; pending reviews, new proposals, newsletter counts) |
 
 ### Errors
@@ -455,7 +460,19 @@ confirmation — in `src/lib/email/templates/`.
      on the verified domain) and `GUIDE_NOTIFY_EMAIL` (the guide's inbox).
   4. Send a test inquiry and check the guide's inbox (and the spam folder) and the visitor's confirmation.
 
-### Plugging in SMTP (or any other provider)
+- **Gmail SMTP** (no domain of your own needed, ~500 recipients/day):
+  1. On the Gmail account turn on **2-Step Verification**, then create an **App Password** at
+     https://myaccount.google.com/apppasswords (name it e.g. "Serendiva API").
+  2. Set `EMAIL_DRIVER=smtp`, `SMTP_USER=<the gmail address>`, `SMTP_PASSWORD=<the 16-letter app password>`,
+     `MAIL_FROM="Serendiva <the same gmail address>"` (Gmail rewrites any other From) and `GUIDE_NOTIFY_EMAIL`.
+  3. `npm run email:test` sends one test email to `GUIDE_NOTIFY_EMAIL` (or `npm run email:test -- you@example.com`).
+
+  Errors are stored as `SMTP error: …` in the lead's `lastEmailError`. `535 … Username and Password not accepted`
+  means a wrong or revoked App Password (the normal Gmail password does not work).
+
+### Plugging in another provider
+
+The SMTP driver (`createSmtpProvider` in `src/lib/email/providers.ts`) is the example to follow.
 
 Email goes through the `EmailProvider` interface (`src/lib/email/types.ts`):
 
@@ -466,28 +483,8 @@ export interface EmailProvider {
 }
 ```
 
-To use SMTP, add `nodemailer` (`npm install nodemailer; npm install -D @types/nodemailer`), implement a provider
-in `src/lib/email/providers.ts`, add `smtp` to `EMAIL_DRIVER` plus an `SMTP_URL` variable in
-`src/config/env.ts`, and select it in `createEmailService` (`src/lib/email/index.ts`):
-
-```ts
-import nodemailer from 'nodemailer'
-
-export function createSmtpProvider(url: string): EmailProvider {
-  const transport = nodemailer.createTransport(url) // smtp://user:pass@smtp.example.com:587
-  return {
-    name: 'smtp',
-    async send(msg) {
-      const info = await transport.sendMail({
-        from: msg.from, to: msg.to, subject: msg.subject, html: msg.html, text: msg.text, replyTo: msg.replyTo,
-      })
-      return { id: info.messageId }
-    },
-  }
-}
-```
-
-A provider must **throw** when sending fails — that is what marks the lead as `failed` and triggers the retry.
+Implement it in `src/lib/email/providers.ts`, add the driver name to `EMAIL_DRIVER` (and its variables) in
+`src/config/env.ts`, and select it in `providerFor` (`src/lib/email/index.ts`). A provider must **throw** when sending fails — that is what marks the lead as `failed` and triggers the retry.
 
 ---
 
@@ -564,6 +561,12 @@ API returns a normal-looking success (with a fake reference) and stores and send
 domain; put the *site key* into the website (`NEXT_PUBLIC_TURNSTILE_SITE_KEY`) and the *secret key* into the API
 (`TURNSTILE_SECRET`). The website sends the widget's token as `turnstileToken`; the API verifies it (with the
 visitor's IP) before saving. Missing or rejected tokens → `400`. Leave `TURNSTILE_SECRET` empty to disable it.
+
+Setup: Cloudflare dashboard → Turnstile → *Add widget*, hostnames = the **website** domains only (e.g. `www.serendiva.com`,
+the Vercel domain — the API needs no hostname, it calls Cloudflare's `siteverify` with the secret). Site key → web
+`NEXT_PUBLIC_TURNSTILE_SITE_KEY`, secret → API `TURNSTILE_SECRET`; always set both together. For local development use
+Cloudflare's always-pass **test keys** (site `1x00000000000000000000AA`, secret `1x0000000000000000000000000000000AA`) —
+never in production.
 
 **Input sanitisation.** Plain-text form fields are stripped of HTML tags and control characters; every value is
 HTML-escaped in emails; CSV exports neutralise spreadsheet formulas (`=`, `+`, `-`, `@`, tab).
@@ -735,7 +738,7 @@ pg_restore --clean --if-exists --no-owner --no-acl --dbname "$env:RESTORE_DATABA
 | `429 RATE_LIMITED` while testing forms | `FORM_RATE_LIMIT` is per IP per minute; raise it in your local `.env` |
 | `429 ACCOUNT_LOCKED` | Wait for the lock to expire, or reset it (SQL piped to `psql`, which keeps the quotes intact in every PowerShell version): `'UPDATE "AdminUser" SET "failedLoginCount" = 0, "lockedUntil" = NULL;' \| docker compose exec -T db psql -U serendiva -d serendiva` |
 | Forgot the admin password | There is no reset email. Delete the admin (`'DELETE FROM "AdminUser";' \| docker compose exec -T db psql -U serendiva -d serendiva`, or the same SQL in the Neon SQL editor), set `ADMIN_SEED_EMAIL`/`ADMIN_SEED_PASSWORD`, then `npm run db:seed -- --skip-content` |
-| No emails arrive | With `EMAIL_DRIVER=console` they are in `tmp\emails\`. With Resend: domain verified? `MAIL_FROM` on that domain? Check the inquiry's `emailStatus`/`lastEmailError` in the admin panel and use *Resend emails* |
+| No emails arrive | With `EMAIL_DRIVER=console` they are in `tmp\emails\`. With Resend: domain verified? `MAIL_FROM` on that domain? With Gmail SMTP: App Password set, `MAIL_FROM` = `SMTP_USER`? Run `npm run email:test`, check the inquiry's `emailStatus`/`lastEmailError` in the admin panel and use *Resend emails* |
 | Images missing on the website | Run `npm run media:import-seed` (seed photos point at remote design URLs until then); check `API_PUBLIC_URL` / `S3_PUBLIC_URL` and the website's `IMAGE_REMOTE_HOSTS` |
 | Website does not update after an admin change | API log *revalidation request was rejected/failed*: `REVALIDATE_SECRET` must be identical in both apps and `FRONTEND_URL` reachable from the API |
 | Log line *SECURITY WARNING: The SSL modes 'prefer', 'require' ...* | Harmless notice from `pg` about `sslmode=require` (it already verifies the certificate) |

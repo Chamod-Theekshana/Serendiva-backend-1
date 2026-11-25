@@ -47,11 +47,13 @@ export default fp(async (app) => {
     transformObject: jsonSchemaTransformObject,
   })
 
-  await app.register(swaggerUi, {
-    routePrefix: '/docs',
-    uiConfig: { docExpansion: 'list', deepLinking: true, withCredentials: true },
-    staticCSP: true,
-  })
+  if (env.NODE_ENV !== 'production' || env.DOCS_ENABLED) {
+    await app.register(swaggerUi, {
+      routePrefix: '/docs',
+      uiConfig: { docExpansion: 'list', deepLinking: true, withCredentials: true },
+      staticCSP: true,
+    })
 
-  app.get('/openapi.json', { schema: { hide: true } }, async () => app.swagger())
+    app.get('/openapi.json', { schema: { hide: true } }, async () => app.swagger())
+  }
 })

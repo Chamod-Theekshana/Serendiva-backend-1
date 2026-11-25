@@ -49,7 +49,7 @@ import { regions } from './seed-data/regions'
 import { destinations } from './seed-data/destinations'
 import { tours } from './seed-data/tours'
 import { reviews } from './seed-data/reviews'
-import { bookingFaqs, corporateFaqs, destinationFaqs, generalFaqs, tourFaqs } from './seed-data/faqs'
+import { bookingFaqs, corporateFaqs, destinationFaqs, generalFaqs, reviewsFaqs, tourFaqs, travelGuideFaqs } from './seed-data/faqs'
 import { blogPosts } from './seed-data/blog'
 import { galleryItems } from './seed-data/gallery'
 import { availability } from './seed-data/availability'
@@ -593,7 +593,7 @@ async function seedReviews(
 
 async function seedFaqs(tx: Tx, tourIds: Map<string, string>, destinationIds: Map<string, string>) {
   const groups: {
-    scope: 'general' | 'booking' | 'corporate' | 'tour' | 'destination'
+    scope: 'general' | 'booking' | 'corporate' | 'reviews' | 'travelGuide' | 'tour' | 'destination'
     faqs: SeedFaq[]
     tour?: string
     destination?: string
@@ -601,6 +601,8 @@ async function seedFaqs(tx: Tx, tourIds: Map<string, string>, destinationIds: Ma
     { scope: 'general', faqs: generalFaqs },
     { scope: 'booking', faqs: bookingFaqs },
     { scope: 'corporate', faqs: corporateFaqs },
+    { scope: 'reviews', faqs: reviewsFaqs },
+    { scope: 'travelGuide', faqs: travelGuideFaqs },
     ...Object.entries(tourFaqs).map(([tour, faqs]) => ({ scope: 'tour' as const, faqs, tour })),
     ...Object.entries(destinationFaqs).map(([destination, faqs]) => ({
       scope: 'destination' as const,

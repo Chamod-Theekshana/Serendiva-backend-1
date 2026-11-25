@@ -6086,6 +6086,8 @@
           "general",
           "booking",
           "corporate",
+          "reviews",
+          "travelGuide",
           "tour",
           "destination"
         ]
@@ -8799,12 +8801,317 @@
           "reviewSummary"
         ]
       },
+      "PageContentListItemInput": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[a-z][A-Za-z0-9_-]{0,39}$"
+          },
+          "values": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "maxLength": 10000
+            }
+          }
+        },
+        "required": [
+          "key",
+          "values"
+        ]
+      },
+      "PageContentBodyInput": {
+        "type": "object",
+        "properties": {
+          "values": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "maxLength": 10000
+            }
+          },
+          "hidden": {
+            "default": [],
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "pattern": "^[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)*$"
+            }
+          },
+          "lists": {
+            "default": {},
+            "type": "object",
+            "additionalProperties": {
+              "maxItems": 30,
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/PageContentListItemInput"
+              }
+            }
+          }
+        },
+        "required": [
+          "values"
+        ]
+      },
+      "PageContentEntryInput": {
+        "type": "object",
+        "properties": {
+          "namespace": {
+            "type": "string",
+            "enum": [
+              "common",
+              "home",
+              "about",
+              "blog",
+              "contact",
+              "corporate",
+              "destinations",
+              "destinationDetail",
+              "gallery",
+              "legal",
+              "responsible",
+              "reviews",
+              "tours",
+              "tourDetail",
+              "travelGuide",
+              "quiz"
+            ]
+          },
+          "locale": {
+            "default": "en",
+            "description": "Content language; falls back to English",
+            "type": "string",
+            "enum": [
+              "en",
+              "zh",
+              "de"
+            ]
+          },
+          "values": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "hidden": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "lists": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "values": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "key",
+                  "values"
+                ]
+              }
+            }
+          },
+          "updatedAt": {
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "namespace",
+          "values",
+          "hidden",
+          "lists",
+          "updatedAt"
+        ]
+      },
+      "PublicPageContentInput": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "namespace": {
+                  "type": "string",
+                  "enum": [
+                    "common",
+                    "home",
+                    "about",
+                    "blog",
+                    "contact",
+                    "corporate",
+                    "destinations",
+                    "destinationDetail",
+                    "gallery",
+                    "legal",
+                    "responsible",
+                    "reviews",
+                    "tours",
+                    "tourDetail",
+                    "travelGuide",
+                    "quiz"
+                  ]
+                },
+                "locale": {
+                  "default": "en",
+                  "description": "Content language; falls back to English",
+                  "type": "string",
+                  "enum": [
+                    "en",
+                    "zh",
+                    "de"
+                  ]
+                },
+                "values": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                },
+                "hidden": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "lists": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "key": {
+                          "type": "string"
+                        },
+                        "values": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "key",
+                        "values"
+                      ]
+                    }
+                  }
+                }
+              },
+              "required": [
+                "namespace",
+                "values",
+                "hidden",
+                "lists"
+              ]
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "AdminPageContentInput": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PageContentEntryInput"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
       "LeadStatusInput": {
         "type": "string",
         "enum": [
           "new",
           "replied",
-          "closed"
+          "proposal_sent",
+          "confirmed",
+          "lost",
+          "cancelled"
+        ],
+        "description": "new → replied → proposal_sent → confirmed (booked), or lost / cancelled"
+      },
+      "LeadEventTypeInput": {
+        "type": "string",
+        "enum": [
+          "status",
+          "note",
+          "contact",
+          "follow_up",
+          "booking"
+        ]
+      },
+      "LeadEventInput": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/LeadEventTypeInput"
+          },
+          "fromStatus": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LeadStatusInput"
+              }
+            ]
+          },
+          "toStatus": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LeadStatusInput"
+              }
+            ]
+          },
+          "text": {
+            "nullable": true,
+            "description": "note: the notes as saved · contact: \"<channel>: <note>\" · follow_up: YYYY-MM-DD or null",
+            "type": "string"
+          },
+          "actorName": {
+            "nullable": true,
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "fromStatus",
+          "toStatus",
+          "text",
+          "actorName",
+          "createdAt"
         ]
       },
       "LeadEmailStatusInput": {
@@ -8830,7 +9137,22 @@
             "minimum": -9007199254740991,
             "maximum": 9007199254740991
           },
-          "closed": {
+          "proposal_sent": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "confirmed": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "lost": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "cancelled": {
             "type": "integer",
             "minimum": -9007199254740991,
             "maximum": 9007199254740991
@@ -8844,10 +9166,36 @@
         "required": [
           "new",
           "replied",
-          "closed",
+          "proposal_sent",
+          "confirmed",
+          "lost",
+          "cancelled",
           "total"
         ],
         "description": "Counts per status for the current filters (ignoring the status filter)"
+      },
+      "LeadContactBodyInput": {
+        "type": "object",
+        "properties": {
+          "channel": {
+            "type": "string",
+            "enum": [
+              "whatsapp",
+              "email",
+              "phone",
+              "meeting",
+              "other"
+            ]
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 1000,
+            "nullable": true
+          }
+        },
+        "required": [
+          "channel"
+        ]
       },
       "InquiryBodyInput": {
         "type": "object",
@@ -9118,6 +9466,22 @@
             "description": "Cloudflare Turnstile token (when enabled)",
             "type": "string",
             "maxLength": 4096
+          },
+          "clientRequestId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  ""
+                ]
+              },
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_-]{8,64}$",
+                "description": "Random id generated once per form submission (e.g. a UUID). Sending the same id again returns the same reference instead of a duplicate."
+              }
+            ],
+            "nullable": true
           }
         },
         "required": [
@@ -9268,6 +9632,33 @@
           "status": {
             "$ref": "#/components/schemas/LeadStatusInput"
           },
+          "repliedAt": {
+            "nullable": true,
+            "description": "First reply (left \"new\")",
+            "type": "string"
+          },
+          "lastContactAt": {
+            "type": "string"
+          },
+          "followUpAt": {
+            "nullable": true,
+            "description": "YYYY-MM-DD",
+            "type": "string"
+          },
+          "replyOverdue": {
+            "type": "boolean",
+            "description": "Still \"new\" after the promised response time"
+          },
+          "bookedStart": {
+            "nullable": true,
+            "description": "YYYY-MM-DD (confirmed journey)",
+            "type": "string"
+          },
+          "bookedEnd": {
+            "nullable": true,
+            "description": "YYYY-MM-DD (confirmed journey)",
+            "type": "string"
+          },
           "emailStatus": {
             "$ref": "#/components/schemas/LeadEmailStatusInput"
           },
@@ -9300,6 +9691,12 @@
           "sourcePage",
           "locale",
           "status",
+          "repliedAt",
+          "lastContactAt",
+          "followUpAt",
+          "replyOverdue",
+          "bookedStart",
+          "bookedEnd",
           "emailStatus",
           "hasNotes",
           "createdAt",
@@ -9450,6 +9847,74 @@
             "nullable": true,
             "type": "string"
           },
+          "repliedAt": {
+            "nullable": true,
+            "description": "First reply (left \"new\")",
+            "type": "string"
+          },
+          "confirmedAt": {
+            "nullable": true,
+            "type": "string"
+          },
+          "closedAt": {
+            "nullable": true,
+            "description": "Became lost / cancelled",
+            "type": "string"
+          },
+          "lastContactAt": {
+            "type": "string"
+          },
+          "followUpAt": {
+            "nullable": true,
+            "description": "YYYY-MM-DD",
+            "type": "string"
+          },
+          "lostReason": {
+            "nullable": true,
+            "type": "string"
+          },
+          "replyOverdue": {
+            "type": "boolean",
+            "description": "Still \"new\" after the promised response time"
+          },
+          "bookedStart": {
+            "nullable": true,
+            "description": "YYYY-MM-DD — dates of the confirmed journey",
+            "type": "string"
+          },
+          "bookedEnd": {
+            "nullable": true,
+            "description": "YYYY-MM-DD",
+            "type": "string"
+          },
+          "calendarBlock": {
+            "nullable": true,
+            "description": "The busy range this booking added to the availability calendar",
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "startDate": {
+                "type": "string"
+              },
+              "endDate": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "startDate",
+              "endDate"
+            ]
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LeadEventInput"
+            },
+            "description": "History, newest first (up to 100)"
+          },
           "emailStatus": {
             "$ref": "#/components/schemas/LeadEmailStatusInput"
           },
@@ -9505,6 +9970,17 @@
           "locale",
           "status",
           "internalNotes",
+          "repliedAt",
+          "confirmedAt",
+          "closedAt",
+          "lastContactAt",
+          "followUpAt",
+          "lostReason",
+          "replyOverdue",
+          "bookedStart",
+          "bookedEnd",
+          "calendarBlock",
+          "events",
           "emailStatus",
           "guideEmailSentAt",
           "visitorEmailSentAt",
@@ -9528,8 +10004,193 @@
             "nullable": true,
             "type": "string",
             "maxLength": 10000
+          },
+          "followUpAt": {
+            "description": "Follow-up reminder date (YYYY-MM-DD); null clears it. Cleared automatically when the lead is lost / cancelled.",
+            "nullable": true,
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  ""
+                ]
+              },
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              }
+            ]
+          },
+          "lostReason": {
+            "description": "Why the lead was lost / cancelled (kept only for those statuses)",
+            "nullable": true,
+            "type": "string",
+            "maxLength": 600
+          },
+          "bookedStart": {
+            "description": "Dates of the confirmed journey; null clears them",
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "nullable": true
+          },
+          "bookedEnd": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "nullable": true
+          },
+          "blockCalendar": {
+            "description": "Keep a busy range on the availability calendar while the inquiry is confirmed (default: on when confirming). Without booked dates the visitor's exact travel dates are used.",
+            "type": "boolean"
           }
         }
+      },
+      "AdminInquiryCreateBodyInput": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 240
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "whatsapp": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 80
+          },
+          "country": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 160
+          },
+          "partyType": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TravellerTypeInput"
+              }
+            ]
+          },
+          "adults": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          },
+          "children": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 50
+          },
+          "travelStart": {
+            "nullable": true,
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "travelEnd": {
+            "nullable": true,
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "travelWindow": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 240
+          },
+          "flexibleDates": {
+            "type": "boolean"
+          },
+          "durationPreference": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 120
+          },
+          "pace": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 120
+          },
+          "stayStyle": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 160
+          },
+          "interests": {
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 120
+            }
+          },
+          "tourId": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 64
+          },
+          "destinationId": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 64
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LeadStatusInput"
+              }
+            ]
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "whatsapp",
+              "phone",
+              "email",
+              "referral",
+              "other"
+            ]
+          },
+          "followUpAt": {
+            "nullable": true,
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "bookedStart": {
+            "nullable": true,
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "bookedEnd": {
+            "nullable": true,
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "blockCalendar": {
+            "type": "boolean"
+          },
+          "message": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 10000
+          },
+          "internalNotes": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 10000
+          },
+          "locale": {
+            "type": "string",
+            "enum": [
+              "en",
+              "zh",
+              "de"
+            ]
+          }
+        },
+        "required": [
+          "name"
+        ]
       },
       "ProposalResultInput": {
         "type": "object",
@@ -9633,6 +10294,23 @@
           "status": {
             "$ref": "#/components/schemas/LeadStatusInput"
           },
+          "repliedAt": {
+            "nullable": true,
+            "description": "First reply (left \"new\")",
+            "type": "string"
+          },
+          "lastContactAt": {
+            "type": "string"
+          },
+          "followUpAt": {
+            "nullable": true,
+            "description": "YYYY-MM-DD",
+            "type": "string"
+          },
+          "replyOverdue": {
+            "type": "boolean",
+            "description": "Still \"new\" after the promised response time"
+          },
           "emailStatus": {
             "$ref": "#/components/schemas/LeadEmailStatusInput"
           },
@@ -9662,6 +10340,10 @@
           "sourcePage",
           "locale",
           "status",
+          "repliedAt",
+          "lastContactAt",
+          "followUpAt",
+          "replyOverdue",
           "emailStatus",
           "hasNotes",
           "createdAt",
@@ -9752,6 +10434,43 @@
             "nullable": true,
             "type": "string"
           },
+          "repliedAt": {
+            "nullable": true,
+            "description": "First reply (left \"new\")",
+            "type": "string"
+          },
+          "confirmedAt": {
+            "nullable": true,
+            "type": "string"
+          },
+          "closedAt": {
+            "nullable": true,
+            "description": "Became lost / cancelled",
+            "type": "string"
+          },
+          "lastContactAt": {
+            "type": "string"
+          },
+          "followUpAt": {
+            "nullable": true,
+            "description": "YYYY-MM-DD",
+            "type": "string"
+          },
+          "lostReason": {
+            "nullable": true,
+            "type": "string"
+          },
+          "replyOverdue": {
+            "type": "boolean",
+            "description": "Still \"new\" after the promised response time"
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LeadEventInput"
+            },
+            "description": "History, newest first (up to 100)"
+          },
           "emailStatus": {
             "$ref": "#/components/schemas/LeadEmailStatusInput"
           },
@@ -9796,6 +10515,14 @@
           "locale",
           "status",
           "internalNotes",
+          "repliedAt",
+          "confirmedAt",
+          "closedAt",
+          "lastContactAt",
+          "followUpAt",
+          "lostReason",
+          "replyOverdue",
+          "events",
           "emailStatus",
           "guideEmailSentAt",
           "visitorEmailSentAt",
@@ -9819,6 +10546,28 @@
             "nullable": true,
             "type": "string",
             "maxLength": 10000
+          },
+          "followUpAt": {
+            "description": "Follow-up reminder date (YYYY-MM-DD); null clears it. Cleared automatically when the lead is lost / cancelled.",
+            "nullable": true,
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  ""
+                ]
+              },
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              }
+            ]
+          },
+          "lostReason": {
+            "description": "Why the lead was lost / cancelled (kept only for those statuses)",
+            "nullable": true,
+            "type": "string",
+            "maxLength": 600
           }
         }
       },
@@ -9858,6 +10607,11 @@
             "description": "Honeypot — leave empty",
             "type": "string",
             "maxLength": 500
+          },
+          "turnstileToken": {
+            "description": "Cloudflare Turnstile token (when enabled)",
+            "type": "string",
+            "maxLength": 4096
           }
         },
         "required": [
@@ -10587,7 +11341,22 @@
                     "minimum": -9007199254740991,
                     "maximum": 9007199254740991
                   },
-                  "closed": {
+                  "proposal_sent": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "confirmed": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "lost": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "cancelled": {
                     "type": "integer",
                     "minimum": -9007199254740991,
                     "maximum": 9007199254740991
@@ -10596,14 +11365,17 @@
                 "required": [
                   "new",
                   "replied",
-                  "closed"
+                  "proposal_sent",
+                  "confirmed",
+                  "lost",
+                  "cancelled"
                 ]
               },
               "conversionRate": {
                 "type": "number",
                 "minimum": 0,
                 "maximum": 1,
-                "description": "(replied + closed) / total, 0 when there are none"
+                "description": "(replied + proposal_sent + confirmed) / total, 0 when there are none"
               },
               "byMonth": {
                 "type": "array",
@@ -10772,13 +11544,34 @@
               "confirmed",
               "pending"
             ]
+          },
+          "emailAlerts": {
+            "type": "object",
+            "properties": {
+              "inquiries": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "proposals": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "inquiries",
+              "proposals"
+            ],
+            "description": "Leads whose notification email to the guide never arrived (older than 5 minutes)"
           }
         },
         "required": [
           "inquiries",
           "proposals",
           "reviews",
-          "newsletter"
+          "newsletter",
+          "emailAlerts"
         ]
       },
       "ErrorResponse": {
@@ -17095,6 +17888,8 @@
           "general",
           "booking",
           "corporate",
+          "reviews",
+          "travelGuide",
           "tour",
           "destination"
         ]
@@ -19922,13 +20717,331 @@
         ],
         "additionalProperties": false
       },
+      "PageContentListItem": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[a-z][A-Za-z0-9_-]{0,39}$"
+          },
+          "values": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "maxLength": 10000
+            }
+          }
+        },
+        "required": [
+          "key",
+          "values"
+        ],
+        "additionalProperties": false
+      },
+      "PageContentBody": {
+        "type": "object",
+        "properties": {
+          "values": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "maxLength": 10000
+            }
+          },
+          "hidden": {
+            "default": [],
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "pattern": "^[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)*$"
+            }
+          },
+          "lists": {
+            "default": {},
+            "type": "object",
+            "additionalProperties": {
+              "maxItems": 30,
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/PageContentListItem"
+              }
+            }
+          }
+        },
+        "required": [
+          "values",
+          "hidden",
+          "lists"
+        ],
+        "additionalProperties": false
+      },
+      "PageContentEntry": {
+        "type": "object",
+        "properties": {
+          "namespace": {
+            "type": "string",
+            "enum": [
+              "common",
+              "home",
+              "about",
+              "blog",
+              "contact",
+              "corporate",
+              "destinations",
+              "destinationDetail",
+              "gallery",
+              "legal",
+              "responsible",
+              "reviews",
+              "tours",
+              "tourDetail",
+              "travelGuide",
+              "quiz"
+            ]
+          },
+          "locale": {
+            "default": "en",
+            "description": "Content language; falls back to English",
+            "type": "string",
+            "enum": [
+              "en",
+              "zh",
+              "de"
+            ]
+          },
+          "values": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "hidden": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "lists": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "values": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "key",
+                  "values"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "updatedAt": {
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "namespace",
+          "locale",
+          "values",
+          "hidden",
+          "lists",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "PublicPageContent": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "namespace": {
+                  "type": "string",
+                  "enum": [
+                    "common",
+                    "home",
+                    "about",
+                    "blog",
+                    "contact",
+                    "corporate",
+                    "destinations",
+                    "destinationDetail",
+                    "gallery",
+                    "legal",
+                    "responsible",
+                    "reviews",
+                    "tours",
+                    "tourDetail",
+                    "travelGuide",
+                    "quiz"
+                  ]
+                },
+                "locale": {
+                  "default": "en",
+                  "description": "Content language; falls back to English",
+                  "type": "string",
+                  "enum": [
+                    "en",
+                    "zh",
+                    "de"
+                  ]
+                },
+                "values": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                },
+                "hidden": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "lists": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "key": {
+                          "type": "string"
+                        },
+                        "values": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "key",
+                        "values"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              },
+              "required": [
+                "namespace",
+                "locale",
+                "values",
+                "hidden",
+                "lists"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "AdminPageContent": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PageContentEntry"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
       "LeadStatus": {
         "type": "string",
         "enum": [
           "new",
           "replied",
-          "closed"
+          "proposal_sent",
+          "confirmed",
+          "lost",
+          "cancelled"
+        ],
+        "description": "new → replied → proposal_sent → confirmed (booked), or lost / cancelled"
+      },
+      "LeadEventType": {
+        "type": "string",
+        "enum": [
+          "status",
+          "note",
+          "contact",
+          "follow_up",
+          "booking"
         ]
+      },
+      "LeadEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/LeadEventType"
+          },
+          "fromStatus": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LeadStatus"
+              }
+            ]
+          },
+          "toStatus": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LeadStatus"
+              }
+            ]
+          },
+          "text": {
+            "nullable": true,
+            "description": "note: the notes as saved · contact: \"<channel>: <note>\" · follow_up: YYYY-MM-DD or null",
+            "type": "string"
+          },
+          "actorName": {
+            "nullable": true,
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "fromStatus",
+          "toStatus",
+          "text",
+          "actorName",
+          "createdAt"
+        ],
+        "additionalProperties": false
       },
       "LeadEmailStatus": {
         "type": "string",
@@ -19953,7 +21066,22 @@
             "minimum": -9007199254740991,
             "maximum": 9007199254740991
           },
-          "closed": {
+          "proposal_sent": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "confirmed": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "lost": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "cancelled": {
             "type": "integer",
             "minimum": -9007199254740991,
             "maximum": 9007199254740991
@@ -19967,11 +21095,38 @@
         "required": [
           "new",
           "replied",
-          "closed",
+          "proposal_sent",
+          "confirmed",
+          "lost",
+          "cancelled",
           "total"
         ],
         "additionalProperties": false,
         "description": "Counts per status for the current filters (ignoring the status filter)"
+      },
+      "LeadContactBody": {
+        "type": "object",
+        "properties": {
+          "channel": {
+            "type": "string",
+            "enum": [
+              "whatsapp",
+              "email",
+              "phone",
+              "meeting",
+              "other"
+            ]
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 500,
+            "nullable": true
+          }
+        },
+        "required": [
+          "channel"
+        ],
+        "additionalProperties": false
       },
       "InquiryBody": {
         "type": "object",
@@ -20033,7 +21188,8 @@
             "description": "Cloudflare Turnstile token (when enabled)",
             "type": "string",
             "maxLength": 4096
-          }
+          },
+          "clientRequestId": {}
         },
         "required": [
           "name",
@@ -20055,7 +21211,8 @@
           "destinationSlug",
           "message",
           "sourcePage",
-          "locale"
+          "locale",
+          "clientRequestId"
         ],
         "additionalProperties": false
       },
@@ -20205,6 +21362,33 @@
           "status": {
             "$ref": "#/components/schemas/LeadStatus"
           },
+          "repliedAt": {
+            "nullable": true,
+            "description": "First reply (left \"new\")",
+            "type": "string"
+          },
+          "lastContactAt": {
+            "type": "string"
+          },
+          "followUpAt": {
+            "nullable": true,
+            "description": "YYYY-MM-DD",
+            "type": "string"
+          },
+          "replyOverdue": {
+            "type": "boolean",
+            "description": "Still \"new\" after the promised response time"
+          },
+          "bookedStart": {
+            "nullable": true,
+            "description": "YYYY-MM-DD (confirmed journey)",
+            "type": "string"
+          },
+          "bookedEnd": {
+            "nullable": true,
+            "description": "YYYY-MM-DD (confirmed journey)",
+            "type": "string"
+          },
           "emailStatus": {
             "$ref": "#/components/schemas/LeadEmailStatus"
           },
@@ -20237,6 +21421,12 @@
           "sourcePage",
           "locale",
           "status",
+          "repliedAt",
+          "lastContactAt",
+          "followUpAt",
+          "replyOverdue",
+          "bookedStart",
+          "bookedEnd",
           "emailStatus",
           "hasNotes",
           "createdAt",
@@ -20389,6 +21579,75 @@
             "nullable": true,
             "type": "string"
           },
+          "repliedAt": {
+            "nullable": true,
+            "description": "First reply (left \"new\")",
+            "type": "string"
+          },
+          "confirmedAt": {
+            "nullable": true,
+            "type": "string"
+          },
+          "closedAt": {
+            "nullable": true,
+            "description": "Became lost / cancelled",
+            "type": "string"
+          },
+          "lastContactAt": {
+            "type": "string"
+          },
+          "followUpAt": {
+            "nullable": true,
+            "description": "YYYY-MM-DD",
+            "type": "string"
+          },
+          "lostReason": {
+            "nullable": true,
+            "type": "string"
+          },
+          "replyOverdue": {
+            "type": "boolean",
+            "description": "Still \"new\" after the promised response time"
+          },
+          "bookedStart": {
+            "nullable": true,
+            "description": "YYYY-MM-DD — dates of the confirmed journey",
+            "type": "string"
+          },
+          "bookedEnd": {
+            "nullable": true,
+            "description": "YYYY-MM-DD",
+            "type": "string"
+          },
+          "calendarBlock": {
+            "nullable": true,
+            "description": "The busy range this booking added to the availability calendar",
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "startDate": {
+                "type": "string"
+              },
+              "endDate": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "startDate",
+              "endDate"
+            ],
+            "additionalProperties": false
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LeadEvent"
+            },
+            "description": "History, newest first (up to 100)"
+          },
           "emailStatus": {
             "$ref": "#/components/schemas/LeadEmailStatus"
           },
@@ -20444,6 +21703,17 @@
           "locale",
           "status",
           "internalNotes",
+          "repliedAt",
+          "confirmedAt",
+          "closedAt",
+          "lastContactAt",
+          "followUpAt",
+          "lostReason",
+          "replyOverdue",
+          "bookedStart",
+          "bookedEnd",
+          "calendarBlock",
+          "events",
           "emailStatus",
           "guideEmailSentAt",
           "visitorEmailSentAt",
@@ -20468,8 +21738,195 @@
             "nullable": true,
             "type": "string",
             "maxLength": 10000
+          },
+          "followUpAt": {
+            "description": "Follow-up reminder date (YYYY-MM-DD); null clears it. Cleared automatically when the lead is lost / cancelled.",
+            "nullable": true,
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "lostReason": {
+            "description": "Why the lead was lost / cancelled (kept only for those statuses)",
+            "nullable": true,
+            "type": "string",
+            "maxLength": 300
+          },
+          "bookedStart": {
+            "description": "Dates of the confirmed journey; null clears them",
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "nullable": true
+          },
+          "bookedEnd": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "nullable": true
+          },
+          "blockCalendar": {
+            "description": "Keep a busy range on the availability calendar while the inquiry is confirmed (default: on when confirming). Without booked dates the visitor's exact travel dates are used.",
+            "type": "boolean"
           }
         },
+        "additionalProperties": false
+      },
+      "AdminInquiryCreateBody": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 2
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  ""
+                ]
+              },
+              {
+                "type": "string",
+                "format": "email",
+                "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+              }
+            ]
+          },
+          "whatsapp": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 40
+          },
+          "country": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 80
+          },
+          "partyType": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TravellerType"
+              }
+            ]
+          },
+          "adults": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          },
+          "children": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 50
+          },
+          "travelStart": {
+            "nullable": true,
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "travelEnd": {
+            "nullable": true,
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "travelWindow": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 120
+          },
+          "flexibleDates": {
+            "type": "boolean"
+          },
+          "durationPreference": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 60
+          },
+          "pace": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 60
+          },
+          "stayStyle": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 80
+          },
+          "interests": {
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 60
+            }
+          },
+          "tourId": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 64
+          },
+          "destinationId": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 64
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LeadStatus"
+              }
+            ]
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "whatsapp",
+              "phone",
+              "email",
+              "referral",
+              "other"
+            ]
+          },
+          "followUpAt": {
+            "nullable": true,
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "bookedStart": {
+            "nullable": true,
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "bookedEnd": {
+            "nullable": true,
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "blockCalendar": {
+            "type": "boolean"
+          },
+          "message": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 5000
+          },
+          "internalNotes": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 10000
+          },
+          "locale": {
+            "type": "string",
+            "enum": [
+              "en",
+              "zh",
+              "de"
+            ]
+          }
+        },
+        "required": [
+          "name"
+        ],
         "additionalProperties": false
       },
       "ProposalResult": {
@@ -20576,6 +22033,23 @@
           "status": {
             "$ref": "#/components/schemas/LeadStatus"
           },
+          "repliedAt": {
+            "nullable": true,
+            "description": "First reply (left \"new\")",
+            "type": "string"
+          },
+          "lastContactAt": {
+            "type": "string"
+          },
+          "followUpAt": {
+            "nullable": true,
+            "description": "YYYY-MM-DD",
+            "type": "string"
+          },
+          "replyOverdue": {
+            "type": "boolean",
+            "description": "Still \"new\" after the promised response time"
+          },
           "emailStatus": {
             "$ref": "#/components/schemas/LeadEmailStatus"
           },
@@ -20605,6 +22079,10 @@
           "sourcePage",
           "locale",
           "status",
+          "repliedAt",
+          "lastContactAt",
+          "followUpAt",
+          "replyOverdue",
           "emailStatus",
           "hasNotes",
           "createdAt",
@@ -20697,6 +22175,43 @@
             "nullable": true,
             "type": "string"
           },
+          "repliedAt": {
+            "nullable": true,
+            "description": "First reply (left \"new\")",
+            "type": "string"
+          },
+          "confirmedAt": {
+            "nullable": true,
+            "type": "string"
+          },
+          "closedAt": {
+            "nullable": true,
+            "description": "Became lost / cancelled",
+            "type": "string"
+          },
+          "lastContactAt": {
+            "type": "string"
+          },
+          "followUpAt": {
+            "nullable": true,
+            "description": "YYYY-MM-DD",
+            "type": "string"
+          },
+          "lostReason": {
+            "nullable": true,
+            "type": "string"
+          },
+          "replyOverdue": {
+            "type": "boolean",
+            "description": "Still \"new\" after the promised response time"
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LeadEvent"
+            },
+            "description": "History, newest first (up to 100)"
+          },
           "emailStatus": {
             "$ref": "#/components/schemas/LeadEmailStatus"
           },
@@ -20741,6 +22256,14 @@
           "locale",
           "status",
           "internalNotes",
+          "repliedAt",
+          "confirmedAt",
+          "closedAt",
+          "lastContactAt",
+          "followUpAt",
+          "lostReason",
+          "replyOverdue",
+          "events",
           "emailStatus",
           "guideEmailSentAt",
           "visitorEmailSentAt",
@@ -20765,6 +22288,18 @@
             "nullable": true,
             "type": "string",
             "maxLength": 10000
+          },
+          "followUpAt": {
+            "description": "Follow-up reminder date (YYYY-MM-DD); null clears it. Cleared automatically when the lead is lost / cancelled.",
+            "nullable": true,
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "lostReason": {
+            "description": "Why the lead was lost / cancelled (kept only for those statuses)",
+            "nullable": true,
+            "type": "string",
+            "maxLength": 300
           }
         },
         "additionalProperties": false
@@ -20791,6 +22326,11 @@
             "description": "Honeypot — leave empty",
             "type": "string",
             "maxLength": 500
+          },
+          "turnstileToken": {
+            "description": "Cloudflare Turnstile token (when enabled)",
+            "type": "string",
+            "maxLength": 4096
           }
         },
         "required": [
@@ -21549,7 +23089,22 @@
                     "minimum": -9007199254740991,
                     "maximum": 9007199254740991
                   },
-                  "closed": {
+                  "proposal_sent": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "confirmed": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "lost": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "cancelled": {
                     "type": "integer",
                     "minimum": -9007199254740991,
                     "maximum": 9007199254740991
@@ -21558,7 +23113,10 @@
                 "required": [
                   "new",
                   "replied",
-                  "closed"
+                  "proposal_sent",
+                  "confirmed",
+                  "lost",
+                  "cancelled"
                 ],
                 "additionalProperties": false
               },
@@ -21566,7 +23124,7 @@
                 "type": "number",
                 "minimum": 0,
                 "maximum": 1,
-                "description": "(replied + closed) / total, 0 when there are none"
+                "description": "(replied + proposal_sent + confirmed) / total, 0 when there are none"
               },
               "byMonth": {
                 "type": "array",
@@ -21743,13 +23301,35 @@
               "pending"
             ],
             "additionalProperties": false
+          },
+          "emailAlerts": {
+            "type": "object",
+            "properties": {
+              "inquiries": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "proposals": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "inquiries",
+              "proposals"
+            ],
+            "additionalProperties": false,
+            "description": "Leads whose notification email to the guide never arrived (older than 5 minutes)"
           }
         },
         "required": [
           "inquiries",
           "proposals",
           "reviews",
-          "newsletter"
+          "newsletter",
+          "emailAlerts"
         ],
         "additionalProperties": false
       }
@@ -23378,6 +24958,83 @@
         }
       }
     },
+    "/api/v1/page-content/public": {
+      "get": {
+        "summary": "Admin overrides of the static page copy (English + the requested locale)",
+        "tags": [
+          "Content"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "default": "en",
+              "type": "string",
+              "enum": [
+                "en",
+                "zh",
+                "de"
+              ]
+            },
+            "in": "query",
+            "name": "locale",
+            "required": false,
+            "description": "Content language; falls back to English"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicPageContent"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/inquiries": {
       "post": {
         "summary": "Send a travel inquiry (saved first, then the guide and the visitor are emailed)",
@@ -23455,7 +25112,7 @@
         "tags": [
           "Forms"
         ],
-        "description": "Send as **multipart/form-data** (not JSON). Fields:\n\n| field | rules |\n| --- | --- |\n| company | required, 2–160 chars |\n| contactPerson | required, 2–120 chars |\n| email | required, valid email |\n| phone | required, 5–40 chars |\n| groupSize | required, ≤ 60 chars (e.g. \"25–40 guests\") |\n| dates | required, ≤ 120 chars |\n| eventType | required, ≤ 80 chars |\n| logistics | optional, ≤ 10 items of ≤ 60 chars — repeat the field per item or send one comma-separated value |\n| message | optional, ≤ 5000 chars |\n| sourcePage | optional, ≤ 300 chars |\n| locale | optional, en / zh / de (default en) |\n| website | honeypot — leave empty |\n| turnstileToken | Cloudflare Turnstile token (required only when Turnstile is enabled) |\n| attachment | optional file, PDF or DOCX, ≤ 5 MB (checked by content, not by extension) |\n\nErrors: 400 VALIDATION_ERROR with `details: [{ path, message }]`, 413 when the attachment is larger than 5 MB,\n415 when it is not a PDF/DOCX (both with `details: [{ path: \"attachment\", message }]`).",
+        "description": "Send as **multipart/form-data** (not JSON). Fields:\n\n| field | rules |\n| --- | --- |\n| company | required, 2–160 chars |\n| contactPerson | required, 2–120 chars |\n| email | required, valid email |\n| phone | required, 5–40 chars |\n| groupSize | required, ≤ 60 chars (e.g. \"25–40 guests\") |\n| dates | required, ≤ 120 chars |\n| eventType | required, ≤ 80 chars |\n| logistics | optional, ≤ 10 items of ≤ 60 chars — repeat the field per item or send one comma-separated value |\n| message | optional, ≤ 5000 chars |\n| sourcePage | optional, ≤ 300 chars |\n| locale | optional, en / zh / de (default en) |\n| website | honeypot — leave empty |\n| turnstileToken | Cloudflare Turnstile token (required only when Turnstile is enabled) |\n| clientRequestId | optional idempotency key (8–64 chars) so retries return the same reference |\n| attachment | optional file, PDF or DOCX, ≤ 5 MB (checked by content, not by extension) |\n\nErrors: 400 VALIDATION_ERROR with `details: [{ path, message }]`, 413 when the attachment is larger than 5 MB,\n415 when it is not a PDF/DOCX (both with `details: [{ path: \"attachment\", message }]`).",
         "responses": {
           "201": {
             "description": "Default Response",
@@ -23955,7 +25612,7 @@
       "put": {
         "summary": "Update the current admin profile",
         "tags": [
-          "Admin Â· Auth"
+          "Admin · Auth"
         ],
         "requestBody": {
           "required": true,
@@ -29529,7 +31186,33 @@
             "in": "query",
             "name": "q",
             "required": false,
-            "description": "Search name, email, reference and message"
+            "description": "Search name, email, WhatsApp number, reference, message and notes"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "reply",
+                "followUp"
+              ]
+            },
+            "in": "query",
+            "name": "due",
+            "required": false,
+            "description": "reply = still \"new\" after the promised response time (oldest first) · followUp = follow-up date today or earlier"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "newest",
+                "oldest"
+              ]
+            },
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "description": "Default newest first (oldest first with due=reply)"
           },
           {
             "schema": {
@@ -29550,6 +31233,28 @@
             "name": "country",
             "required": false,
             "description": "Exact country (case-insensitive)"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 64
+            },
+            "in": "query",
+            "name": "destination",
+            "required": false,
+            "description": "Destination id"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "missing"
+              ]
+            },
+            "in": "query",
+            "name": "guideEmail",
+            "required": false,
+            "description": "\"missing\" = the notification email to the guide never arrived"
           },
           {
             "schema": {
@@ -29586,6 +31291,89 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AdminInquiryList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Log a manual inquiry or booking (WhatsApp, phone, referral…)",
+        "tags": [
+          "Admin · Leads"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminInquiryCreateBodyInput"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminInquiry"
                 }
               }
             }
@@ -29690,7 +31478,33 @@
             "in": "query",
             "name": "q",
             "required": false,
-            "description": "Search name, email, reference and message"
+            "description": "Search name, email, WhatsApp number, reference, message and notes"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "reply",
+                "followUp"
+              ]
+            },
+            "in": "query",
+            "name": "due",
+            "required": false,
+            "description": "reply = still \"new\" after the promised response time (oldest first) · followUp = follow-up date today or earlier"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "newest",
+                "oldest"
+              ]
+            },
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "description": "Default newest first (oldest first with due=reply)"
           },
           {
             "schema": {
@@ -29711,6 +31525,28 @@
             "name": "country",
             "required": false,
             "description": "Exact country (case-insensitive)"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 64
+            },
+            "in": "query",
+            "name": "destination",
+            "required": false,
+            "description": "Destination id"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "missing"
+              ]
+            },
+            "in": "query",
+            "name": "guideEmail",
+            "required": false,
+            "description": "\"missing\" = the notification email to the guide never arrived"
           }
         ],
         "security": [
@@ -29870,7 +31706,7 @@
         }
       },
       "patch": {
-        "summary": "Update status and/or internal notes",
+        "summary": "Update status, follow-up, booking dates and/or internal notes",
         "tags": [
           "Admin · Leads"
         ],
@@ -29989,6 +31825,103 @@
         "responses": {
           "204": {
             "description": "Default Response"
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/inquiries/{id}/contacts": {
+      "post": {
+        "summary": "Log a contact with the guest (moves \"new\" to \"replied\")",
+        "tags": [
+          "Admin · Leads"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LeadContactBodyInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminInquiry"
+                }
+              }
+            }
           },
           "400": {
             "description": "Default Response",
@@ -30178,7 +32111,45 @@
             "in": "query",
             "name": "q",
             "required": false,
-            "description": "Search company, contact person, email and reference"
+            "description": "Search company, contact person, email, phone, reference, brief and notes"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "reply",
+                "followUp"
+              ]
+            },
+            "in": "query",
+            "name": "due",
+            "required": false,
+            "description": "reply = still \"new\" after the promised response time (oldest first) · followUp = follow-up date today or earlier"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "newest",
+                "oldest"
+              ]
+            },
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "description": "Default newest first (oldest first with due=reply)"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "missing"
+              ]
+            },
+            "in": "query",
+            "name": "guideEmail",
+            "required": false,
+            "description": "\"missing\" = the notification email to the guide never arrived"
           },
           {
             "schema": {
@@ -30319,7 +32290,45 @@
             "in": "query",
             "name": "q",
             "required": false,
-            "description": "Search company, contact person, email and reference"
+            "description": "Search company, contact person, email, phone, reference, brief and notes"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "reply",
+                "followUp"
+              ]
+            },
+            "in": "query",
+            "name": "due",
+            "required": false,
+            "description": "reply = still \"new\" after the promised response time (oldest first) · followUp = follow-up date today or earlier"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "newest",
+                "oldest"
+              ]
+            },
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "description": "Default newest first (oldest first with due=reply)"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "missing"
+              ]
+            },
+            "in": "query",
+            "name": "guideEmail",
+            "required": false,
+            "description": "\"missing\" = the notification email to the guide never arrived"
           }
         ],
         "security": [
@@ -30479,7 +32488,7 @@
         }
       },
       "patch": {
-        "summary": "Update status and/or internal notes",
+        "summary": "Update status, follow-up and/or internal notes",
         "tags": [
           "Admin · Leads"
         ],
@@ -30684,6 +32693,103 @@
                   "type": "string",
                   "format": "binary",
                   "description": "File contents (application/pdf or DOCX)"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/proposals/{id}/contacts": {
+      "post": {
+        "summary": "Log a contact with the client (moves \"new\" to \"replied\")",
+        "tags": [
+          "Admin · Leads"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LeadContactBodyInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminProposal"
                 }
               }
             }
@@ -32488,6 +34594,194 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AdminSettings"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/page-content": {
+      "get": {
+        "summary": "Every stored page-copy override",
+        "tags": [
+          "Admin · Page content"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminPageContent"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/page-content/{namespace}": {
+      "put": {
+        "summary": "Replace the copy overrides (and hidden sections) of one page namespace",
+        "tags": [
+          "Admin · Page content"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PageContentBodyInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "common",
+                "home",
+                "about",
+                "blog",
+                "contact",
+                "corporate",
+                "destinations",
+                "destinationDetail",
+                "gallery",
+                "legal",
+                "responsible",
+                "reviews",
+                "tours",
+                "tourDetail",
+                "travelGuide",
+                "quiz"
+              ]
+            },
+            "in": "path",
+            "name": "namespace",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminPageContent"
                 }
               }
             }

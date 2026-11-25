@@ -1,5 +1,5 @@
 import { randomInt } from 'node:crypto'
-import type { LeadCounts } from './lead-schemas'
+import type { LeadCounts, LeadStatus } from './lead-schemas'
 
 /** Small helpers shared by the lead modules (inquiries, proposals) and their exports. */
 
@@ -51,11 +51,30 @@ export function textPreview(text: string | null, max = 160): string | null {
 }
 
 /** Status counts (all statuses present, plus total) from a Prisma groupBy on `status`. */
-export function countsFrom(groups: { status: 'new' | 'replied' | 'closed'; _count: { _all: number } }[]): LeadCounts {
-  const counts: LeadCounts = { new: 0, replied: 0, closed: 0, total: 0 }
+export function countsFrom(groups: { status: LeadStatus; _count: { _all: number } }[]): LeadCounts {
+  const counts: LeadCounts = { new: 0, replied: 0, proposal_sent: 0, confirmed: 0, lost: 0, cancelled: 0, total: 0 }
   for (const g of groups) {
     counts[g.status] = g._count._all
     counts.total += g._count._all
   }
   return counts
+}
+
+/**
+ * Digits for a wa.me link, or null when the number has no country code: "+44 7700 900123" and
+ * "0044 7700…" work, a local "07700 900123" cannot be turned into a working link.
+ */
+export function whatsappDigits(value: string | null | undefined): string | null {
+  const raw = (value ?? '').trim()
+  if (!raw) return null
+  let digits = raw.replace(/\D/g, '')
+  if (raw.startsWith('+')) {
+    // "+44 (0) 7700…" — the bracketed trunk zero is not dialled internationally.
+    digits = raw.replace(/\(0\)/g, '').replace(/\D/g, '')
+  } else if (digits.startsWith('00')) {
+    digits = digits.slice(2)
+  } else if (digits.startsWith('0')) {
+    return null
+  }
+  return digits.length >= 8 && digits.length <= 15 ? digits : null
 }

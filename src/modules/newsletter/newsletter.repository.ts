@@ -17,6 +17,11 @@ export function createNewsletterRepository(prisma: PrismaClient) {
       prisma.newsletterSubscriber.findUnique({ where: { unsubscribeToken } }),
     exists: (id: string) => prisma.newsletterSubscriber.findUnique({ where: { id }, select: { id: true } }),
 
+    countPendingSince: (since: Date) =>
+      prisma.newsletterSubscriber.count({
+        where: { confirmedAt: null, unsubscribedAt: null, updatedAt: { gte: since } },
+      }),
+
     create: (data: Prisma.NewsletterSubscriberCreateInput) => prisma.newsletterSubscriber.create({ data }),
     update: (id: string, data: Prisma.NewsletterSubscriberUpdateInput) =>
       prisma.newsletterSubscriber.update({ where: { id }, data }),

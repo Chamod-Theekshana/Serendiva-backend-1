@@ -41,7 +41,7 @@ describe('newsletter double opt-in', () => {
     expect(row).toMatchObject({ locale: 'de', source: 'footer', confirmedAt: null })
 
     const mail = await waitFor(() => ctx.email.to('reader@example.com')[0], { message: 'confirmation email' })
-    expect(mail.subject).toBe('Please confirm your Serendiva subscription')
+    expect(mail.subject).toBe('Bitte bestätigen Sie Ihre Serendiva-Anmeldung')
     // Links point at the localized website pages
     expect(mail.html).toContain('http://www.serendiva.test/de/newsletter/confirm?token=')
     const confirmToken = tokenFrom(mail.html, '/newsletter/confirm')

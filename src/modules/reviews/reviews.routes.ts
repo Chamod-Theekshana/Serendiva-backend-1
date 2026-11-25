@@ -59,7 +59,7 @@ export const reviewsPublicRoutes: FastifyPluginAsyncZod = async (app) => {
         response: { 201: ReviewSubmissionResult, ...errorResponses },
       },
     },
-    async (req, reply) => reply.status(201).send(await service.submit(req.body, req.ip)),
+    async (req, reply) => reply.status(201).send(await service.submit(req.body, { ip: req.ip, log: req.log })),
   )
 }
 

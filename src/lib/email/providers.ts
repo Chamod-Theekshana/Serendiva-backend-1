@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import nodemailer from 'nodemailer'
 import { Resend } from 'resend'
 import type { FastifyBaseLogger } from 'fastify'
 import type { EmailProvider } from './types'
@@ -19,6 +20,49 @@ export function createResendProvider(apiKey: string): EmailProvider {
       })
       if (error) throw new Error(`Resend error: ${error.message}`)
       return { id: data?.id }
+    },
+  }
+}
+
+export interface SmtpOptions {
+  host: string
+  port: number
+  secure: boolean
+  user: string
+  password: string
+}
+
+/**
+ * Plain SMTP (e.g. Gmail with an App Password: smtp.gmail.com, port 465, secure). Needs no domain of your own;
+ * with Gmail the From address must be the signed-in account (Gmail rewrites any other address).
+ */
+export function createSmtpProvider(opts: SmtpOptions): EmailProvider {
+  const transport = nodemailer.createTransport({
+    host: opts.host,
+    port: opts.port,
+    secure: opts.secure,
+    // Google shows App Passwords as "abcd efgh ijkl mnop"; the spaces are not part of it.
+    auth: { user: opts.user, pass: opts.password.replace(/\s+/g, '') },
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 20_000,
+  })
+  return {
+    name: 'smtp',
+    async send(msg) {
+      try {
+        const info = await transport.sendMail({
+          from: msg.from,
+          to: msg.to,
+          subject: msg.subject,
+          html: msg.html,
+          text: msg.text,
+          replyTo: msg.replyTo,
+        })
+        return { id: info.messageId }
+      } catch (err) {
+        throw new Error(`SMTP error: ${err instanceof Error ? err.message : String(err)}`)
+      }
     },
   }
 }

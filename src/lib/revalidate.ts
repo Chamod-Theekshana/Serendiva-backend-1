@@ -55,5 +55,6 @@ export const Tags = {
   gallery: 'gallery',
   availability: 'availability',
   settings: 'settings',
+  pageContent: 'page-content',
   sitemap: 'sitemap',
 } as const

@@ -9,6 +9,7 @@ import { blogAdminRoutes, blogPublicRoutes } from './blog/blog.routes'
 import { galleryAdminRoutes, galleryPublicRoutes } from './gallery/gallery.routes'
 import { availabilityAdminRoutes, availabilityPublicRoutes } from './availability/availability.routes'
 import { settingsAdminRoutes, settingsPublicRoutes } from './settings/settings.routes'
+import { pageContentAdminRoutes, pageContentPublicRoutes } from './page-content/page-content.routes'
 import { inquiriesAdminRoutes, inquiriesPublicRoutes } from './inquiries/inquiries.routes'
 import { proposalsAdminRoutes, proposalsPublicRoutes } from './proposals/proposals.routes'
 import { newsletterAdminRoutes, newsletterPublicRoutes } from './newsletter/newsletter.routes'
@@ -32,6 +33,7 @@ export const publicModules: ModuleEntry[] = [
   { plugin: galleryPublicRoutes, prefix: '' },
   { plugin: availabilityPublicRoutes, prefix: '' },
   { plugin: settingsPublicRoutes, prefix: '' },
+  { plugin: pageContentPublicRoutes, prefix: '' },
   { plugin: inquiriesPublicRoutes, prefix: '' },
   { plugin: proposalsPublicRoutes, prefix: '' },
   { plugin: newsletterPublicRoutes, prefix: '' },
@@ -54,5 +56,6 @@ export const adminModules: ModuleEntry[] = [
   { plugin: newsletterAdminRoutes, prefix: '' },
   { plugin: mediaAdminRoutes, prefix: '' },
   { plugin: settingsAdminRoutes, prefix: '' },
+  { plugin: pageContentAdminRoutes, prefix: '' },
   { plugin: statsAdminRoutes, prefix: '' },
 ]

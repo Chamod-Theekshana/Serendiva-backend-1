@@ -2,6 +2,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
 import { z } from 'zod'
 import { adminErrorResponses, ErrorResponseSchema, errorResponses, IdParams } from '@/lib/schemas'
 import { attachmentDisposition, csvFilename } from '@/modules/inquiries/lead-helpers'
+import { LeadContactBody } from '@/modules/inquiries/lead-schemas'
 import {
   AdminProposalList,
   AdminProposalSchema,
@@ -29,6 +30,7 @@ const FORM_DESCRIPTION = `Send as **multipart/form-data** (not JSON). Fields:
 | locale | optional, en / zh / de (default en) |
 | website | honeypot — leave empty |
 | turnstileToken | Cloudflare Turnstile token (required only when Turnstile is enabled) |
+| clientRequestId | optional idempotency key (8–64 chars) so retries return the same reference |
 | attachment | optional file, PDF or DOCX, ≤ 5 MB (checked by content, not by extension) |
 
 Errors: 400 VALIDATION_ERROR with \`details: [{ path, message }]\`, 413 when the attachment is larger than 5 MB,
@@ -122,8 +124,13 @@ export const proposalsAdminRoutes: FastifyPluginAsyncZod = async (app) => {
   )
   app.patch(
     '/proposals/:id',
-    { schema: { tags, security, summary: 'Update status and/or internal notes', params: IdParams, body: ProposalUpdateBody, response: { 200: AdminProposalSchema, ...adminErrorResponses } } },
-    async (req) => service.update(req.params.id, req.body),
+    { schema: { tags, security, summary: 'Update status, follow-up and/or internal notes', params: IdParams, body: ProposalUpdateBody, response: { 200: AdminProposalSchema, ...adminErrorResponses } } },
+    async (req) => service.update(req.params.id, req.body, req.admin?.name ?? null),
+  )
+  app.post(
+    '/proposals/:id/contacts',
+    { schema: { tags, security, summary: 'Log a contact with the client (moves "new" to "replied")', params: IdParams, body: LeadContactBody, response: { 200: AdminProposalSchema, ...adminErrorResponses } } },
+    async (req) => service.logContact(req.params.id, req.body, req.admin?.name ?? null),
   )
   app.delete(
     '/proposals/:id',

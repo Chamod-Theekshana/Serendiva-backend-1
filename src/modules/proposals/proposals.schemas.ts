@@ -4,14 +4,19 @@ import { longText, text } from '@/lib/sanitize'
 import { PageMetaSchema } from '@/lib/pagination'
 import {
   blankable,
+  ClientRequestIdField,
   EmailField,
   HoneypotField,
   LeadCountsSchema,
   LeadEmailStatusEnum,
+  LeadEventSchema,
+  leadLifecycleFields,
+  leadListLifecycleFields,
   LeadListFilters,
   LeadPagination,
   LeadStatusEnum,
   leadUpdateFields,
+  PhoneField,
   TurnstileField,
 } from '@/modules/inquiries/lead-schemas'
 
@@ -30,7 +35,7 @@ export const ProposalFields = z.object({
   company: text(160).pipe(z.string().min(2, 'Please enter your company name')),
   contactPerson: text(120).pipe(z.string().min(2, 'Please enter a contact person')),
   email: EmailField,
-  phone: text(40).pipe(z.string().min(5, 'Please enter a phone number')),
+  phone: PhoneField,
   groupSize: required(60, 'Please enter the group size'),
   dates: required(120, 'Please enter the dates'),
   eventType: required(80, 'Please choose the type of event'),
@@ -44,6 +49,7 @@ export const ProposalFields = z.object({
   locale: blankable(z.enum(LOCALES)).transform((v) => v ?? 'en'),
   website: HoneypotField,
   turnstileToken: TurnstileField,
+  clientRequestId: ClientRequestIdField,
 })
 
 export type ProposalFieldsT = z.infer<typeof ProposalFields>
@@ -66,7 +72,8 @@ export type ProposalResultT = z.infer<typeof ProposalResult>
 
 export const AdminProposalsQuery = z.object({
   ...LeadListFilters,
-  q: LeadListFilters.q.describe('Search company, contact person, email and reference'),
+  q: LeadListFilters.q.describe('Search company, contact person, email, phone, reference, brief and notes'),
+  guideEmail: z.enum(['missing']).optional().describe('"missing" = the notification email to the guide never arrived'),
   ...LeadPagination,
 })
 
@@ -102,6 +109,7 @@ export const AdminProposalListItem = z
     sourcePage: z.string().nullable(),
     locale: z.string(),
     status: LeadStatusEnum,
+    ...leadListLifecycleFields,
     emailStatus: LeadEmailStatusEnum,
     hasNotes: z.boolean(),
     createdAt: z.string(),
@@ -133,6 +141,8 @@ export const AdminProposalSchema = z
     locale: z.string(),
     status: LeadStatusEnum,
     internalNotes: z.string().nullable(),
+    ...leadLifecycleFields,
+    events: z.array(LeadEventSchema).describe('History, newest first (up to 100)'),
     emailStatus: LeadEmailStatusEnum,
     guideEmailSentAt: z.string().nullable(),
     visitorEmailSentAt: z.string().nullable(),

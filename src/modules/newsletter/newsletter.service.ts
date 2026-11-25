@@ -6,6 +6,7 @@ import { iso } from '@/lib/dates'
 import { AppError, notFound } from '@/lib/errors'
 import { pageMeta, toSkipTake } from '@/lib/pagination'
 import { toCsv } from '@/lib/csv'
+import { verifyTurnstile } from '@/lib/turnstile'
 import type { RequestContext } from '@/modules/inquiries/inquiries.service'
 import { runAfterResponse } from '@/modules/inquiries/lead-emails'
 import { siteUrl } from '@/modules/inquiries/lead-helpers'
@@ -58,9 +59,28 @@ function searchWhere(q: string | undefined): Prisma.NewsletterSubscriberWhereInp
 const isUniqueViolation = (err: unknown) =>
   err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002'
 
+const DAY_MS = 24 * 60 * 60 * 1000
+
 export function createNewsletterService(deps: AppDeps) {
   const repo = createNewsletterRepository(deps.prisma)
   const { env } = deps
+  const recentByEmail = new Map<string, number[]>()
+
+  function countAndPruneRecentEmail(email: string, now: number): number {
+    const key = email.toLowerCase()
+    const cutoff = now - DAY_MS
+    const fresh = (recentByEmail.get(key) ?? []).filter((ts) => ts >= cutoff)
+    if (fresh.length === 0) recentByEmail.delete(key)
+    else recentByEmail.set(key, fresh)
+    if (recentByEmail.size > 5000) {
+      for (const [k, list] of recentByEmail) {
+        const kept = list.filter((ts) => ts >= cutoff)
+        if (kept.length === 0) recentByEmail.delete(k)
+        else recentByEmail.set(k, kept)
+      }
+    }
+    return fresh.length
+  }
 
   /** Create the subscriber or restart double opt-in for an unconfirmed / unsubscribed address. */
   async function upsertPending(body: NewsletterSubscribeBodyT) {
@@ -79,6 +99,7 @@ export function createNewsletterService(deps: AppDeps) {
         ctx.log.info('newsletter honeypot triggered; submission discarded')
         return { status: 'pending', message: PENDING_MESSAGE }
       }
+      await verifyTurnstile(env.TURNSTILE_SECRET, body.turnstileToken, ctx.ip)
 
       let result: Awaited<ReturnType<typeof upsertPending>>
       try {
@@ -91,10 +112,25 @@ export function createNewsletterService(deps: AppDeps) {
       if (result.alreadySubscribed) return { status: 'already_subscribed', message: ALREADY_MESSAGE }
 
       const s = result.subscriber
+      const now = Date.now()
+      const since = new Date(now - DAY_MS)
+      const sameAddress = countAndPruneRecentEmail(s.email, now)
+      const totalPending = await repo.countPendingSince(since)
+      if (sameAddress >= env.VISITOR_EMAILS_PER_ADDRESS_PER_DAY || totalPending > env.VISITOR_EMAILS_PER_DAY) {
+        ctx.log.warn(
+          { subscriberId: s.id, sameAddress, totalPending },
+          'newsletter confirmation limit reached; confirmation email skipped',
+        )
+        return { status: 'pending', message: PENDING_MESSAGE }
+      }
+      const key = s.email.toLowerCase()
+      recentByEmail.set(key, [...(recentByEmail.get(key) ?? []), now])
+
       const token = s.confirmToken!
       const email = newsletterConfirmEmail({
         confirmUrl: siteUrl(env.FRONTEND_URL, s.locale, `/newsletter/confirm?token=${encodeURIComponent(token)}`),
         unsubscribeUrl: siteUrl(env.FRONTEND_URL, s.locale, `/newsletter/unsubscribe?token=${encodeURIComponent(s.unsubscribeToken)}`),
+        locale: s.locale,
       })
       runAfterResponse(ctx.log, { subscriberId: s.id }, async () => {
         await deps.email.send({ ...email, to: s.email })

@@ -51,6 +51,8 @@ enum FaqScope {
   corporate
   tour
   destination
+  reviews
+  travelGuide
 }
 
 enum GalleryType {
@@ -63,10 +65,27 @@ enum AvailabilityType {
   available
 }
 
+/// Lead lifecycle: new → replied → proposal_sent → confirmed, or lost / cancelled.
 enum LeadStatus {
   new
   replied
-  closed
+  proposal_sent
+  confirmed
+  lost
+  cancelled
+}
+
+enum LeadEventType {
+  /// Status changed (fromStatus → toStatus)
+  status
+  /// Internal notes edited (text = the notes as saved)
+  note
+  /// The guide logged a contact with the visitor (text = channel + optional note)
+  contact
+  /// Follow-up date set or cleared (text = YYYY-MM-DD or null)
+  follow_up
+  /// Booked dates set / calendar block changed (text = summary)
+  booking
 }
 
 enum EmailStatus {
@@ -178,12 +197,12 @@ model Category {
 }
 
 model Tour {
-  id             String        @id @default(cuid())
-  slug           String        @unique
-  status         ContentStatus @default(draft)
-  order          Int           @default(0)
-  isFeatured     Boolean       @default(false)
-  isMostPopular  Boolean       @default(false)
+  id             String          @id @default(cuid())
+  slug           String          @unique
+  status         ContentStatus   @default(draft)
+  order          Int             @default(0)
+  isFeatured     Boolean         @default(false)
+  isMostPopular  Boolean         @default(false)
   publishedAt    DateTime?
   title          Json
   /// One-paragraph teaser used on cards
@@ -216,11 +235,11 @@ model Tour {
   /// Season keys used by the trip quiz: "nov-apr" | "may-sep" | "jul-aug" | "year-round"
   seasons        String[]
   coverId        String?
-  cover          Media?        @relation("TourCover", fields: [coverId], references: [id], onDelete: SetNull)
+  cover          Media?          @relation("TourCover", fields: [coverId], references: [id], onDelete: SetNull)
   seoTitle       Json?
   seoDescription Json?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 
   days         TourDay[]
   gallery      TourImage[]
@@ -505,6 +524,9 @@ model AvailabilityRange {
   endDate   DateTime         @db.Date
   type      AvailabilityType @default(busy)
   note      String?
+  /// Set when the range was created by confirming an inquiry (the booking blocks the calendar).
+  inquiryId String?          @unique
+  inquiry   Inquiry?         @relation(fields: [inquiryId], references: [id], onDelete: SetNull)
   createdAt DateTime         @default(now())
   updatedAt DateTime         @updatedAt
 
@@ -516,42 +538,62 @@ model AvailabilityRange {
 // ---------------------------------------------------------------------------
 
 model Inquiry {
-  id                 String         @id @default(cuid())
+  id                  String             @id @default(cuid())
   /// Human-friendly reference, e.g. SRD-2026-0001
-  reference          String         @unique
-  name               String
-  email              String
-  whatsapp           String?
-  country            String?
-  partyType          TravellerType?
-  adults             Int            @default(2)
-  children           Int            @default(0)
-  travelStart        DateTime?      @db.Date
-  travelEnd          DateTime?      @db.Date
+  reference           String             @unique
+  name                String
+  email               String
+  whatsapp            String?
+  country             String?
+  partyType           TravellerType?
+  adults              Int                @default(2)
+  children            Int                @default(0)
+  travelStart         DateTime?          @db.Date
+  travelEnd           DateTime?          @db.Date
   /// Free label such as "Dec 2026 – Feb 2027 (Peak Dry Season)"
-  travelWindow       String?
-  flexibleDates      Boolean        @default(false)
-  flexibility        String?
-  durationPreference String?
-  pace               String?
-  stayStyle          String?
-  interests          String[]
-  tourId             String?
-  tour               Tour?          @relation(fields: [tourId], references: [id], onDelete: SetNull)
-  destinationId      String?
-  destination        Destination?   @relation(fields: [destinationId], references: [id], onDelete: SetNull)
-  message            String?
-  sourcePage         String?
-  locale             String         @default("en")
-  status             LeadStatus     @default(new)
-  internalNotes      String?
-  emailStatus        EmailStatus    @default(pending)
-  guideEmailSentAt   DateTime?
-  visitorEmailSentAt DateTime?
-  emailAttempts      Int            @default(0)
-  lastEmailError     String?
-  createdAt          DateTime       @default(now())
-  updatedAt          DateTime       @updatedAt
+  travelWindow        String?
+  flexibleDates       Boolean            @default(false)
+  flexibility         String?
+  durationPreference  String?
+  pace                String?
+  stayStyle           String?
+  interests           String[]
+  tourId              String?
+  tour                Tour?              @relation(fields: [tourId], references: [id], onDelete: SetNull)
+  destinationId       String?
+  destination         Destination?       @relation(fields: [destinationId], references: [id], onDelete: SetNull)
+  message             String?
+  sourcePage          String?
+  locale              String             @default("en")
+  status              LeadStatus         @default(new)
+  internalNotes       String?
+  /// First reply (the lead left "new" for replied / proposal sent / confirmed): response time.
+  repliedAt           DateTime?
+  confirmedAt         DateTime?
+  /// When the lead became lost or cancelled.
+  closedAt            DateTime?
+  /// Last contact with the visitor (sent, replied, logged contact). Retention counts from here.
+  lastContactAt       DateTime           @default(now())
+  /// The guide's reminder date for the next follow-up.
+  followUpAt          DateTime?          @db.Date
+  lostReason          String?
+  /// Dates of the confirmed journey (may differ from what the visitor asked for).
+  bookedStart         DateTime?          @db.Date
+  bookedEnd           DateTime?          @db.Date
+  calendarBlock       AvailabilityRange?
+  events              LeadEvent[]
+  emailStatus         EmailStatus        @default(pending)
+  guideEmailSentAt    DateTime?
+  visitorEmailSentAt  DateTime?
+  emailAttempts       Int                @default(0)
+  lastEmailError      String?
+  /// Random id the website sends once per form submission: a retry (double click, timeout) returns the
+  /// same inquiry instead of creating a duplicate.
+  clientRequestId     String?            @unique
+  /// The visitor confirmation was deliberately not sent (anti-spam daily limits): counts as delivered.
+  visitorEmailSkipped Boolean            @default(false)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
 
   @@index([status, createdAt])
   @@index([createdAt])
@@ -559,6 +601,8 @@ model Inquiry {
   @@index([country])
   @@index([tourId])
   @@index([emailStatus])
+  @@index([followUpAt])
+  @@index([lastContactAt])
 }
 
 model CorporateProposal {
@@ -580,17 +624,55 @@ model CorporateProposal {
   locale             String      @default("en")
   status             LeadStatus  @default(new)
   internalNotes      String?
-  emailStatus        EmailStatus @default(pending)
-  guideEmailSentAt   DateTime?
-  visitorEmailSentAt DateTime?
-  emailAttempts      Int         @default(0)
-  lastEmailError     String?
-  createdAt          DateTime    @default(now())
-  updatedAt          DateTime    @updatedAt
+  /// First reply (the lead left "new" for replied / proposal sent / confirmed): response time.
+  repliedAt          DateTime?
+  confirmedAt        DateTime?
+  /// When the lead became lost or cancelled.
+  closedAt           DateTime?
+  /// Last contact with the visitor (sent, replied, logged contact). Retention counts from here.
+  lastContactAt      DateTime    @default(now())
+  /// The guide's reminder date for the next follow-up.
+  followUpAt         DateTime?   @db.Date
+  lostReason         String?
+  events             LeadEvent[]
+  emailStatus         EmailStatus @default(pending)
+  guideEmailSentAt    DateTime?
+  visitorEmailSentAt  DateTime?
+  emailAttempts       Int         @default(0)
+  lastEmailError      String?
+  /// Random id the website sends once per form submission: a retry (double click, timeout) returns the
+  /// same proposal instead of creating a duplicate.
+  clientRequestId     String?     @unique
+  /// The visitor confirmation was deliberately not sent (anti-spam daily limits): counts as delivered.
+  visitorEmailSkipped Boolean     @default(false)
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
 
   @@index([status, createdAt])
   @@index([createdAt])
   @@index([emailStatus])
+  @@index([followUpAt])
+  @@index([lastContactAt])
+}
+
+/// History of a lead (status changes, notes, logged contacts, follow-ups, bookings) — exactly one of
+/// inquiryId / proposalId is set.
+model LeadEvent {
+  id         String             @id @default(cuid())
+  inquiryId  String?
+  inquiry    Inquiry?           @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+  proposalId String?
+  proposal   CorporateProposal? @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  type       LeadEventType
+  fromStatus LeadStatus?
+  toStatus   LeadStatus?
+  text       String?
+  /// Name of the admin who made the change (copied, so it survives the account being removed).
+  actorName  String?
+  createdAt  DateTime           @default(now())
+
+  @@index([inquiryId, createdAt])
+  @@index([proposalId, createdAt])
 }
 
 model NewsletterSubscriber {
@@ -612,10 +694,32 @@ model NewsletterSubscriber {
 // Settings & utilities
 // ---------------------------------------------------------------------------
 
+/// Last run of the daily background jobs (follow-up digest, data retention), so restarts don't repeat them.
+model JobState {
+  key       String   @id
+  lastRunAt DateTime
+  updatedAt DateTime @updatedAt
+}
+
 model SiteSetting {
   key       String   @id
   value     Json
   updatedAt DateTime @updatedAt
+}
+
+/// Admin overrides of the website's static page copy (serendiva-web/src/messages/<locale>/<namespace>.json).
+/// Only changed strings are stored: `values` maps a dotted message path to its text, `hidden` lists
+/// message subtrees (sections) the admin switched off, `lists` rebuilds re-ordered / extended lists
+/// ({ "<path>": [{ key, values }] }). The JSON files stay the defaults.
+model PageContent {
+  namespace String
+  locale    String   @default("en")
+  values    Json     @default("{}")
+  hidden    String[] @default([])
+  lists     Json     @default("{}")
+  updatedAt DateTime @updatedAt
+
+  @@id([namespace, locale])
 }
 
 /// Atomic yearly counters for reference codes (e.g. "inquiry:2026" -> 41)

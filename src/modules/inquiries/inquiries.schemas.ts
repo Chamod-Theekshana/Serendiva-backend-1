@@ -5,19 +5,28 @@ import { PageMetaSchema } from '@/lib/pagination'
 import { TravellerTypeEnum } from '@/modules/shared/public-dto'
 import {
   blankable,
+  ClientRequestIdField,
   DateString,
   EmailField,
   HoneypotField,
+  isNotPastDate,
   LeadCountsSchema,
   LeadEmailStatusEnum,
+  LeadEventSchema,
+  leadLifecycleFields,
+  leadListLifecycleFields,
   LeadListFilters,
   LeadPagination,
   LeadStatusEnum,
   leadUpdateFields,
+  PhoneField,
+  thankYouMessage,
   TurnstileField,
 } from './lead-schemas'
 
-export const INQUIRY_THANK_YOU = 'Thank you — I will reply within 24 hours.'
+/** The thank-you line returned to the website (RESPONSE_HOURS sets the promise). */
+
+export const INQUIRY_THANK_YOU = thankYouMessage(24)
 
 // ---------------------------------------------------------------------------
 // Public form
@@ -29,7 +38,7 @@ export const InquiryBody = z
   .object({
     name: text(120).pipe(z.string().min(2, 'Please enter your name')),
     email: EmailField,
-    whatsapp: blankable(text(40), 'WhatsApp number incl. country code, e.g. "+44 7700 900123"'),
+    whatsapp: blankable(PhoneField, 'WhatsApp number incl. country code, e.g. "+44 7700 900123"'),
     country: blankable(text(80), 'Free text, e.g. "United Kingdom"'),
     partyType: blankable(TravellerTypeEnum),
     adults: z.number().int().min(1).max(50).default(2),
@@ -54,8 +63,12 @@ export const InquiryBody = z
     locale: z.enum(LOCALES).default('en'),
     website: HoneypotField,
     turnstileToken: TurnstileField,
+    clientRequestId: ClientRequestIdField,
   })
   .superRefine((v, ctx) => {
+    if (v.travelStart && !isNotPastDate(v.travelStart)) {
+      ctx.addIssue({ code: 'custom', path: ['travelStart'], message: 'Travel start date cannot be in the past' })
+    }
     if (v.travelStart && v.travelEnd && v.travelEnd < v.travelStart) {
       ctx.addIssue({ code: 'custom', path: ['travelEnd'], message: 'The end date must be on or after the start date' })
     }
@@ -79,9 +92,11 @@ export type InquiryResultT = z.infer<typeof InquiryResult>
 
 export const AdminInquiriesQuery = z.object({
   ...LeadListFilters,
-  q: LeadListFilters.q.describe('Search name, email, reference and message'),
+  q: LeadListFilters.q.describe('Search name, email, WhatsApp number, reference, message and notes'),
   tour: z.string().max(64).optional().describe('Tour id'),
   country: z.string().trim().max(80).optional().describe('Exact country (case-insensitive)'),
+  destination: z.string().max(64).optional().describe('Destination id'),
+  guideEmail: z.enum(['missing']).optional().describe('"missing" = the notification email to the guide never arrived'),
   ...LeadPagination,
 })
 
@@ -116,6 +131,9 @@ export const AdminInquiryListItem = z
     sourcePage: z.string().nullable(),
     locale: z.string(),
     status: LeadStatusEnum,
+    ...leadListLifecycleFields,
+    bookedStart: z.string().nullable().describe('YYYY-MM-DD (confirmed journey)'),
+    bookedEnd: z.string().nullable().describe('YYYY-MM-DD (confirmed journey)'),
     emailStatus: LeadEmailStatusEnum,
     hasNotes: z.boolean(),
     createdAt: z.string(),
@@ -158,6 +176,14 @@ export const AdminInquirySchema = z
     locale: z.string(),
     status: LeadStatusEnum,
     internalNotes: z.string().nullable(),
+    ...leadLifecycleFields,
+    bookedStart: z.string().nullable().describe('YYYY-MM-DD — dates of the confirmed journey'),
+    bookedEnd: z.string().nullable().describe('YYYY-MM-DD'),
+    calendarBlock: z
+      .object({ id: z.string(), startDate: z.string(), endDate: z.string() })
+      .nullable()
+      .describe('The busy range this booking added to the availability calendar'),
+    events: z.array(LeadEventSchema).describe('History, newest first (up to 100)'),
     emailStatus: LeadEmailStatusEnum,
     guideEmailSentAt: z.string().nullable(),
     visitorEmailSentAt: z.string().nullable(),
@@ -170,5 +196,80 @@ export const AdminInquirySchema = z
 
 export type AdminInquiry = z.infer<typeof AdminInquirySchema>
 
-export const InquiryUpdateBody = z.object(leadUpdateFields).meta({ id: 'InquiryUpdateBody' })
+export const InquiryUpdateBody = z
+  .object({
+    ...leadUpdateFields,
+    bookedStart: z.union([z.null(), DateString]).optional().describe('Dates of the confirmed journey; null clears them'),
+    bookedEnd: z.union([z.null(), DateString]).optional(),
+    blockCalendar: z
+      .boolean()
+      .optional()
+      .describe(
+        'Keep a busy range on the availability calendar while the inquiry is confirmed (default: on when confirming). ' +
+          'Without booked dates the visitor\'s exact travel dates are used.',
+      ),
+  })
+  .superRefine((v, ctx) => {
+    if ((v.bookedStart === undefined) !== (v.bookedEnd === undefined) || (v.bookedStart === null) !== (v.bookedEnd === null)) {
+      ctx.addIssue({ code: 'custom', path: ['bookedEnd'], message: 'Send both booked dates (or both null)' })
+    } else if (v.bookedStart && v.bookedEnd && v.bookedEnd < v.bookedStart) {
+      ctx.addIssue({ code: 'custom', path: ['bookedEnd'], message: 'The end date must be on or after the start date' })
+    }
+  })
+  .meta({ id: 'InquiryUpdateBody' })
 export type InquiryUpdateBodyT = z.infer<typeof InquiryUpdateBody>
+
+export const AdminInquiryChannelEnum = z.enum(['whatsapp', 'phone', 'email', 'referral', 'other'])
+
+export const AdminInquiryCreateBody = z
+  .object({
+    name: text(120).pipe(z.string().min(2, 'Please enter the guest name')),
+    email: z
+      .string()
+      .trim()
+      .toLowerCase()
+      .max(200)
+      .pipe(z.union([z.literal(''), z.email('Please enter a valid email address')]))
+      .optional(),
+    whatsapp: text(40).nullable().optional(),
+    country: text(80).nullable().optional(),
+    partyType: TravellerTypeEnum.nullable().optional(),
+    adults: z.number().int().min(1).max(50).optional(),
+    children: z.number().int().min(0).max(50).optional(),
+    travelStart: DateString.nullable().optional(),
+    travelEnd: DateString.nullable().optional(),
+    travelWindow: text(120).nullable().optional(),
+    flexibleDates: z.boolean().optional(),
+    durationPreference: text(60).nullable().optional(),
+    pace: text(60).nullable().optional(),
+    stayStyle: text(80).nullable().optional(),
+    interests: z.array(text(60)).max(20).optional(),
+    tourId: z.string().max(64).nullable().optional(),
+    destinationId: z.string().max(64).nullable().optional(),
+    status: LeadStatusEnum.optional(),
+    channel: AdminInquiryChannelEnum.optional(),
+    followUpAt: DateString.nullable().optional(),
+    bookedStart: DateString.nullable().optional(),
+    bookedEnd: DateString.nullable().optional(),
+    blockCalendar: z.boolean().optional(),
+    message: longText(5000).nullable().optional(),
+    internalNotes: z.string().max(10_000).nullable().optional(),
+    locale: z.enum(LOCALES).optional(),
+  })
+  .superRefine((v, ctx) => {
+    const hasEmail = Boolean(v.email && v.email.trim() !== '')
+    const hasWhatsapp = Boolean(v.whatsapp && v.whatsapp.trim() !== '')
+    if (!hasEmail && !hasWhatsapp) {
+      ctx.addIssue({ code: 'custom', path: ['whatsapp'], message: 'Enter an email address or WhatsApp number' })
+    }
+    if (v.travelStart && v.travelEnd && v.travelEnd < v.travelStart) {
+      ctx.addIssue({ code: 'custom', path: ['travelEnd'], message: 'The end date must be on or after the start date' })
+    }
+    if ((v.bookedStart && !v.bookedEnd) || (!v.bookedStart && v.bookedEnd)) {
+      ctx.addIssue({ code: 'custom', path: ['bookedEnd'], message: 'Send both booked dates' })
+    } else if (v.bookedStart && v.bookedEnd && v.bookedEnd < v.bookedStart) {
+      ctx.addIssue({ code: 'custom', path: ['bookedEnd'], message: 'The end date must be on or after the start date' })
+    }
+  })
+  .meta({ id: 'AdminInquiryCreateBody' })
+export type AdminInquiryCreateBodyT = z.infer<typeof AdminInquiryCreateBody>

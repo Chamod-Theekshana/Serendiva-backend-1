@@ -114,7 +114,7 @@ const authRoutes: FastifyPluginAsyncZod = async (app) => {
     {
       onRequest: [app.authenticate],
       schema: {
-        tags: ['Admin Â· Auth'],
+        tags: ['Admin · Auth'],
         summary: 'Update the current admin profile',
         security: [{ cookieAuth: [] }],
         body: UpdateProfileBody,
