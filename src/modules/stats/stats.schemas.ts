@@ -10,8 +10,15 @@ export const AdminStatsSchema = z
       thisWeek: count.describe('Received since Monday 00:00 UTC'),
       thisMonth: count.describe('Received since the 1st of the month, 00:00 UTC'),
       total: count,
-      byStatus: z.object({ new: count, replied: count, closed: count }),
-      conversionRate: z.number().min(0).max(1).describe('(replied + closed) / total, 0 when there are none'),
+      byStatus: z.object({
+        new: count,
+        replied: count,
+        proposal_sent: count,
+        confirmed: count,
+        lost: count,
+        cancelled: count,
+      }),
+      conversionRate: z.number().min(0).max(1).describe('(replied + proposal_sent + confirmed) / total, 0 when there are none'),
       byMonth: z
         .array(z.object({ month: z.string().meta({ example: '2026-10' }), count }))
         .describe('Last 12 months (UTC), oldest first, including months without inquiries'),
@@ -29,6 +36,9 @@ export const AdminStatsSchema = z
     proposals: z.object({ new: count, total: count }),
     reviews: z.object({ pending: count }),
     newsletter: z.object({ confirmed: count, pending: count }),
+    emailAlerts: z
+      .object({ inquiries: count, proposals: count })
+      .describe('Leads whose notification email to the guide never arrived (older than 5 minutes)'),
   })
   .meta({ id: 'AdminStats' })
 

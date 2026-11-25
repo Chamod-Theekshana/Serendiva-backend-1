@@ -95,10 +95,18 @@ describe('Cloudflare Turnstile (when TURNSTILE_SECRET is set)', () => {
   const mockSiteverify = (success: boolean) =>
     vi.spyOn(globalThis, 'fetch').mockImplementation(async () => Response.json({ success }))
 
-  it('requires a token', async () => {
+  it('requires a token on inquiries and newsletter signups', async () => {
     const res = await ctx.app.inject({ method: 'POST', url: '/api/v1/inquiries', payload: inquiry() })
     expect(res.statusCode).toBe(400)
     expect(res.json<ErrorBody>().error.message).toBe('Please complete the anti-spam check')
+
+    const news = await ctx.app.inject({
+      method: 'POST',
+      url: '/api/v1/newsletter/subscribe',
+      payload: { email: 'turnstile@example.com' },
+    })
+    expect(news.statusCode).toBe(400)
+    expect(news.json<ErrorBody>().error.message).toBe('Please complete the anti-spam check')
   })
 
   it('rejects a token Cloudflare does not accept', async () => {

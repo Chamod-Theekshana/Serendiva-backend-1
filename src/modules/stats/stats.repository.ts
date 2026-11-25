@@ -1,6 +1,7 @@
 import type { PrismaClient } from '@/generated/prisma/client'
 import { inquiryInclude } from '@/modules/inquiries/inquiries.repository'
 import { STATUS_WHERE } from '@/modules/newsletter/newsletter.repository'
+import { guideNotNotifiedWhere } from '@/modules/inquiries/lead-emails'
 
 /** Aggregate queries only — the dashboard never loads whole tables. */
 export function createStatsRepository(prisma: PrismaClient) {
@@ -50,6 +51,13 @@ export function createStatsRepository(prisma: PrismaClient) {
       prisma.$transaction([prisma.corporateProposal.count({ where: { status: 'new' } }), prisma.corporateProposal.count()]),
 
     pendingReviews: () => prisma.review.count({ where: { status: 'pending' } }),
+
+    /** Leads whose guide notification email never arrived (the guide may not know about them). */
+    guideNotNotified: () =>
+      prisma.$transaction([
+        prisma.inquiry.count({ where: guideNotNotifiedWhere() }),
+        prisma.corporateProposal.count({ where: guideNotNotifiedWhere() }),
+      ]),
 
     newsletterCounts: () =>
       prisma.$transaction([

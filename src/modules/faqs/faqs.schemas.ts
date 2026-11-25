@@ -3,7 +3,7 @@ import { LocaleSchema, translatable } from '@/lib/i18n'
 import { TString } from '@/lib/content-schemas'
 import { FaqItemSchema } from '@/modules/shared/public-dto'
 
-export const FAQ_SCOPES = ['general', 'booking', 'corporate', 'tour', 'destination'] as const
+export const FAQ_SCOPES = ['general', 'booking', 'corporate', 'reviews', 'travelGuide', 'tour', 'destination'] as const
 export const FaqScopeEnum = z.enum(FAQ_SCOPES).meta({ id: 'FaqScope' })
 
 // ---------------------------------------------------------------------------

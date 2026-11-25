@@ -3,6 +3,8 @@
  * - general: home page "Everything You Need to Know"
  * - booking: plan-my-trip "Bespoke Planning FAQ" followed by the tours page FAQ
  * - corporate: corporate page "Frequently Addressed Inquiries"
+ * - reviews: reviews page "FAQ on Reviews & Transparency"
+ * - travelGuide: travel guide "Frequently Consulted Practicalities"
  * - tour: The Cultural Odyssey page
  * - destination: Ella (written for the seed)
  *
@@ -127,7 +129,7 @@ export const tourFaqs: Record<string, SeedFaq[]> = {
     {
       question: 'Is this itinerary suitable for children or mature travelers?',
       answer:
-        "Yes. Because the vehicle and the guide are yours alone, I adapt the daily pace to your family. At Sigiriya we can climb at dawn, or enjoy accessible viewpoints from the water gardens if you prefer gentle walking.",
+        'Yes. Because the vehicle and the guide are yours alone, I adapt the daily pace to your family. At Sigiriya we can climb at dawn, or enjoy accessible viewpoints from the water gardens if you prefer gentle walking.',
     },
   ],
 }
@@ -152,3 +154,51 @@ export const destinationFaqs: Record<string, SeedFaq[]> = {
     },
   ],
 }
+
+/** Reviews page "FAQ on Reviews & Transparency" (was static copy in the website messages). */
+export const reviewsFaqs: SeedFaq[] = [
+  {
+    question: 'Are these guest reviews genuinely unedited and verified?',
+    answer:
+      'Every review featured on Serendiva originates from real travelers I have personally guided. I cross-verify entries submitted through TripAdvisor, Google Business, and post-trip direct guest notes. I never edit guest impressions, delete critical observations, or incentivize praise through compensation.',
+  },
+  {
+    question: 'How do you maintain such consistent five-star feedback?',
+    answer:
+      'It stems from absolute personal accountability. I never sub-contract my journeys to anonymous third-party taxi apps or volume agencies. I personally oversee vehicle maintenance, itinerary pacing, dietary checks, and private route clearance for every group, and I limit how many journeys I host at once to guarantee artisanal hospitality.',
+  },
+  {
+    question: 'Can I speak directly with a past traveler from my home country before planning my trip?',
+    answer:
+      'Yes. Many of my former guests—spanning the UK, US, Australia, Switzerland, and Scandinavia—have graciously agreed to act as direct references for curious prospective travelers. Just ask, and I will connect you privately via email with a guest who traveled on an itinerary similar to yours.',
+  },
+  {
+    question: 'What happens if unexpected weather or road conditions affect our itinerary?',
+    answer:
+      'As a licensed National Tourist Guide Lecturer with intimate island knowledge, I adjust routes fluidly without disrupting your comfort. If hill country monsoons affect scenic train operations or tea walks, I pivot toward alternative protected valleys, bespoke tea factory tastings, or cultural sanctuaries with zero logistical stress on your part.',
+  },
+]
+
+/** Travel guide "Frequently Consulted Practicalities" (was static copy in the website messages). */
+export const travelGuideFaqs: SeedFaq[] = [
+  {
+    question: 'Can I buy wine or spirits on full-moon Poya days?',
+    answer:
+      'No — by law, liquor shops and hotel bars close and alcohol is not sold on Poya (full moon) days, one of which falls every month. Many private villas allow you to enjoy your own duty-free bottles discreetly in your suite.',
+  },
+  {
+    question: 'How early should we start the climb at Sigiriya Rock?',
+    answer:
+      'I like to be at the gate as soon as it opens in the early morning. Climbing early avoids the midday heat radiating from the granite, gives you cooler breezes on the Lion’s Paw terrace and keeps you ahead of the tour coaches.',
+  },
+  {
+    question: 'Are domestic flights between Colombo and the coast worthwhile?',
+    answer:
+      'Cinnamon Air runs scheduled and charter flights, some by seaplane landing on lakes and reservoirs. A flight can turn a five-hour mountain drive into a 30-minute hop over the jungle canopy — worthwhile on a short trip, although on longer journeys most guests prefer the scenery of the road.',
+  },
+  {
+    question: 'Do I need a special plug adapter for my devices?',
+    answer:
+      'Sri Lanka uses Type D (large round three-pin) and Type G (British square three-pin) sockets at 230 V. Most boutique hotels have universal sockets or lend adapters on request, but bring one universal adapter to be safe.',
+  },
+]

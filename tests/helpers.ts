@@ -36,6 +36,8 @@ export const TEST_ENV: Record<string, string> = {
   STORAGE_DRIVER: 'local',
   // Generous so ordinary tests never hit it; the rate-limit test builds its own app with a low value.
   FORM_RATE_LIMIT: '1000',
+  VISITOR_EMAILS_PER_ADDRESS_PER_DAY: '1000',
+  VISITOR_EMAILS_PER_DAY: '100000',
   EMAIL_RETRY_DISABLED: 'true',
   REVALIDATE_DISABLED: 'true',
 }

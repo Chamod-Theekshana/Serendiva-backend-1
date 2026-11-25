@@ -22,9 +22,9 @@ export const brand = {
 /**
  * Shared, inline-styled email shell (email clients ignore <style> blocks and web fonts).
  */
-export function layout(opts: { preheader: string; title: string; body: string; footer?: string }): string {
+export function layout(opts: { preheader: string; title: string; body: string; footer?: string; lang?: string }): string {
   return `<!doctype html>
-<html lang="en">
+<html lang="${esc(opts.lang ?? 'en')}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">

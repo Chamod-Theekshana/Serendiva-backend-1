@@ -1,24 +1,40 @@
 import { randomBytes } from 'node:crypto'
 import type { FastifyBaseLogger } from 'fastify'
 import type { AppDeps } from '@/types'
-import type { Prisma } from '@/generated/prisma/client'
+import { Prisma } from '@/generated/prisma/client'
 import type { EmailMessage } from '@/lib/email'
 import { guideProposalEmail, visitorConfirmationEmail } from '@/lib/email/templates'
-import { iso } from '@/lib/dates'
+import { iso, isoDate } from '@/lib/dates'
 import { AppError, notFound, validationError } from '@/lib/errors'
+import { tr } from '@/lib/i18n'
 import { DOC_MIME, sniffMime } from '@/lib/image'
 import { pageMeta, toSkipTake } from '@/lib/pagination'
 import { toCsv } from '@/lib/csv'
 import { PRIVATE_PREFIX } from '@/lib/storage'
 import { verifyTurnstile } from '@/lib/turnstile'
 import type { RequestContext } from '@/modules/inquiries/inquiries.service'
-import { deliverMissingEmails, runAfterResponse, withLeadLock, type LeadEmailStatus } from '@/modules/inquiries/lead-emails'
+import {
+  deliverMissingEmails,
+  guideNotNotifiedWhere,
+  runAfterResponse,
+  withLeadLock,
+  type LeadEmailStatus,
+} from '@/modules/inquiries/lead-emails'
 import { countsFrom, createdAtRange, errorMessage, fakeReference, siteUrl, textPreview } from '@/modules/inquiries/lead-helpers'
+import {
+  dueWhere,
+  eventRows,
+  isReplyOverdue,
+  leadOrder,
+  planLeadContact,
+  planLeadUpdate,
+  toLeadEvent,
+} from '@/modules/inquiries/lead-lifecycle'
+import { thankYouMessage, type LeadContactBodyT } from '@/modules/inquiries/lead-schemas'
 import { attachmentTooLarge, type RawAttachment, type RawProposalForm } from './proposals.multipart'
-import { createProposalsRepository, type ProposalRow } from './proposals.repository'
+import { createProposalsRepository, type ProposalDetailRow, type ProposalRow } from './proposals.repository'
 import {
   MAX_ATTACHMENT_BYTES,
-  PROPOSAL_THANK_YOU,
   ProposalFields,
   REQUIRED_PROPOSAL_FIELDS,
   type AdminProposal,
@@ -30,12 +46,15 @@ import {
   type ProposalUpdateBodyT,
 } from './proposals.schemas'
 
+const isUniqueViolation = (err: unknown) =>
+  err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002'
+
 const ATTACHMENT_FAILED_NOTE =
   'Automatic note: the file attached to this request could not be stored (upload error). Please ask the client to email it.'
 
 const downloadPath = (id: string) => `/api/v1/admin/proposals/${encodeURIComponent(id)}/attachment`
 
-function toListItem(r: ProposalRow): AdminProposalListItemT {
+function toListItem(r: ProposalRow, responseHours = 24, now = new Date()): AdminProposalListItemT {
   return {
     id: r.id,
     reference: r.reference,
@@ -52,6 +71,10 @@ function toListItem(r: ProposalRow): AdminProposalListItemT {
     sourcePage: r.sourcePage,
     locale: r.locale,
     status: r.status,
+    repliedAt: iso(r.repliedAt),
+    lastContactAt: r.lastContactAt.toISOString(),
+    followUpAt: isoDate(r.followUpAt),
+    replyOverdue: isReplyOverdue(r, responseHours, now),
     emailStatus: r.emailStatus,
     hasNotes: Boolean(r.internalNotes?.trim()),
     createdAt: r.createdAt.toISOString(),
@@ -59,7 +82,7 @@ function toListItem(r: ProposalRow): AdminProposalListItemT {
   }
 }
 
-function toAdmin(r: ProposalRow): AdminProposal {
+function toAdmin(r: ProposalDetailRow, responseHours = 24, now = new Date()): AdminProposal {
   return {
     id: r.id,
     reference: r.reference,
@@ -85,6 +108,14 @@ function toAdmin(r: ProposalRow): AdminProposal {
     locale: r.locale,
     status: r.status,
     internalNotes: r.internalNotes,
+    repliedAt: iso(r.repliedAt),
+    confirmedAt: iso(r.confirmedAt),
+    closedAt: iso(r.closedAt),
+    lastContactAt: r.lastContactAt.toISOString(),
+    followUpAt: isoDate(r.followUpAt),
+    lostReason: r.lostReason,
+    replyOverdue: isReplyOverdue(r, responseHours, now),
+    events: r.events.map(toLeadEvent),
     emailStatus: r.emailStatus,
     guideEmailSentAt: iso(r.guideEmailSentAt),
     visitorEmailSentAt: iso(r.visitorEmailSentAt),
@@ -95,23 +126,33 @@ function toAdmin(r: ProposalRow): AdminProposal {
   }
 }
 
-function buildWhere(f: ProposalFilters, opts: { ignoreStatus?: boolean } = {}): Prisma.CorporateProposalWhereInput {
+function buildWhere(
+  f: ProposalFilters,
+  opts: { ignoreStatus?: boolean; responseHours?: number; now?: Date } = {},
+): Prisma.CorporateProposalWhereInput {
   const q = f.q?.trim()
   const insensitive = 'insensitive' as const
   const createdAt = createdAtRange(f.from, f.to)
+  const and: Prisma.CorporateProposalWhereInput[] = []
+  if (f.due) and.push(dueWhere(f.due, opts.responseHours ?? 24, opts.now))
+  if (f.guideEmail === 'missing') and.push(guideNotNotifiedWhere(opts.now))
+  if (q) {
+    and.push({
+      OR: [
+        { company: { contains: q, mode: insensitive } },
+        { contactPerson: { contains: q, mode: insensitive } },
+        { email: { contains: q, mode: insensitive } },
+        { phone: { contains: q } },
+        { reference: { contains: q, mode: insensitive } },
+        { message: { contains: q, mode: insensitive } },
+        { internalNotes: { contains: q, mode: insensitive } },
+      ],
+    })
+  }
   return {
     ...(f.status && !opts.ignoreStatus ? { status: f.status } : {}),
     ...(createdAt ? { createdAt } : {}),
-    ...(q
-      ? {
-          OR: [
-            { company: { contains: q, mode: insensitive } },
-            { contactPerson: { contains: q, mode: insensitive } },
-            { email: { contains: q, mode: insensitive } },
-            { reference: { contains: q, mode: insensitive } },
-          ],
-        }
-      : {}),
+    ...(and.length ? { AND: and } : {}),
   }
 }
 
@@ -176,17 +217,25 @@ export function createProposalsService(deps: AppDeps) {
       attachmentUrl: r.attachment ? `${env.FRONTEND_URL.replace(/\/$/, '')}${downloadPath(r.id)}` : null,
       attachmentName: r.attachment?.originalName ?? null,
       adminUrl: siteUrl(env.FRONTEND_URL, 'en', `/admin/proposals?id=${encodeURIComponent(r.id)}`),
+      responseHours: env.RESPONSE_HOURS,
     })
     return { ...rendered, to: env.GUIDE_NOTIFY_EMAIL, replyTo: r.email }
   }
 
   async function visitorMessage(r: ProposalRow): Promise<EmailMessage> {
+    const settings = await repo.emailSettings()
+    const locale = r.locale === 'de' || r.locale === 'zh' ? r.locale : 'en'
+    const guideTitle = tr<string>(settings.guideTitle, locale, settings.guideTitle.en)
     const rendered = visitorConfirmationEmail({
       reference: r.reference,
       name: r.contactPerson,
-      whatsappNumber: await repo.contactWhatsapp(),
+      whatsappNumber: settings.whatsapp,
       siteUrl: env.FRONTEND_URL,
       kind: 'proposal',
+      locale: r.locale,
+      responseHours: env.RESPONSE_HOURS,
+      guideName: settings.guideName,
+      guideTitle,
     })
     return { ...rendered, to: r.email }
   }
@@ -224,27 +273,56 @@ export function createProposalsService(deps: AppDeps) {
 
   const service = {
     async submit(form: RawProposalForm, ctx: RequestContext): Promise<ProposalResultT> {
+      const thankYou = thankYouMessage(env.RESPONSE_HOURS)
       const fields = parseFields(form)
       if (fields.website && fields.website.trim() !== '') {
         ctx.log.info('proposal honeypot triggered; submission discarded')
-        return { reference: fakeReference('proposal'), message: PROPOSAL_THANK_YOU }
+        return { reference: fakeReference('proposal'), message: thankYou }
+      }
+      if (fields.clientRequestId) {
+        const existing = await repo.findByClientRequestId(fields.clientRequestId)
+        if (existing) {
+          ctx.log.info({ proposalId: existing.id, reference: existing.reference }, 'proposal re-sent; returning the saved one')
+          return { reference: existing.reference, message: thankYou }
+        }
       }
       await verifyTurnstile(env.TURNSTILE_SECRET, fields.turnstileToken, ctx.ip)
       const fileType = form.attachment ? checkAttachment(form.attachment) : null
 
-      const created = await repo.create({
-        company: fields.company,
-        contactPerson: fields.contactPerson,
-        email: fields.email,
-        phone: fields.phone,
-        groupSize: fields.groupSize,
-        dates: fields.dates,
-        eventType: fields.eventType,
-        logistics: fields.logistics,
-        message: fields.message ?? null,
-        sourcePage: fields.sourcePage ?? null,
-        locale: fields.locale,
-      })
+      const since = new Date(Date.now() - 24 * 60 * 60 * 1000)
+      const [sameAddress, total] = await Promise.all([
+        repo.countConfirmationsSince(since, fields.email),
+        repo.countConfirmationsSince(since),
+      ])
+      const visitorEmailSkipped =
+        sameAddress >= env.VISITOR_EMAILS_PER_ADDRESS_PER_DAY || total >= env.VISITOR_EMAILS_PER_DAY
+      if (visitorEmailSkipped) ctx.log.warn({ sameAddress, total }, 'proposal visitor confirmation limit reached; confirmation skipped')
+
+      let created: { id: string; reference: string; createdAt: Date }
+      try {
+        created = await repo.create({
+          company: fields.company,
+          contactPerson: fields.contactPerson,
+          email: fields.email,
+          phone: fields.phone,
+          groupSize: fields.groupSize,
+          dates: fields.dates,
+          eventType: fields.eventType,
+          logistics: fields.logistics,
+          message: fields.message ?? null,
+          sourcePage: fields.sourcePage ?? null,
+          locale: fields.locale,
+          clientRequestId: fields.clientRequestId ?? null,
+          visitorEmailSkipped,
+        })
+      } catch (err) {
+        const existing =
+          fields.clientRequestId && isUniqueViolation(err)
+            ? await repo.findByClientRequestId(fields.clientRequestId)
+            : null
+        if (!existing) throw err
+        return { reference: existing.reference, message: thankYou }
+      }
       ctx.log.info({ proposalId: created.id, reference: created.reference }, 'corporate proposal saved')
 
       if (form.attachment && fileType) await storeAttachment(created, form.attachment, fileType, ctx.log)
@@ -252,7 +330,7 @@ export function createProposalsService(deps: AppDeps) {
       runAfterResponse(ctx.log, { proposalId: created.id, reference: created.reference }, () =>
         service.sendMissingEmails(created.id, ctx.log),
       )
-      return { reference: created.reference, message: PROPOSAL_THANK_YOU }
+      return { reference: created.reference, message: thankYou }
     },
 
     /** See InquiriesService.sendMissingEmails — same contract for proposals. */
@@ -280,26 +358,42 @@ export function createProposalsService(deps: AppDeps) {
     // ---------------------------------------------------------------- admin
 
     async adminList(q: AdminProposalsQueryT) {
+      const now = new Date()
       const { skip, take } = toSkipTake(q)
+      const whereOpts = { responseHours: env.RESPONSE_HOURS, now }
       const [[rows, total], groups] = await Promise.all([
-        repo.list(buildWhere(q), skip, take),
-        repo.countByStatus(buildWhere(q, { ignoreStatus: true })),
+        repo.list(buildWhere(q, whereOpts), skip, take, leadOrder(q)),
+        repo.countByStatus(buildWhere(q, { ...whereOpts, ignoreStatus: true })),
       ])
-      return { items: rows.map(toListItem), meta: pageMeta(q, total), counts: countsFrom(groups) }
+      return {
+        items: rows.map((r) => toListItem(r, env.RESPONSE_HOURS, now)),
+        meta: pageMeta(q, total),
+        counts: countsFrom(groups),
+      }
     },
 
     async adminGet(id: string): Promise<AdminProposal> {
       const row = await repo.findById(id)
       if (!row) throw notFound('Proposal')
-      return toAdmin(row)
+      return toAdmin(row, env.RESPONSE_HOURS)
     },
 
-    async update(id: string, body: ProposalUpdateBodyT): Promise<AdminProposal> {
-      if (!(await repo.exists(id))) throw notFound('Proposal')
-      const data: { status?: ProposalUpdateBodyT['status']; internalNotes?: string | null } = {}
-      if (body.status) data.status = body.status
-      if (body.internalNotes !== undefined) data.internalNotes = body.internalNotes?.trim() || null
-      return toAdmin(await repo.update(id, data))
+    async update(id: string, body: ProposalUpdateBodyT, actorName: string | null = null): Promise<AdminProposal> {
+      const existing = await repo.findById(id)
+      if (!existing) throw notFound('Proposal')
+      const now = new Date()
+      const plan = planLeadUpdate(existing, body, now, actorName)
+      const updated = await repo.applyLifecycleUpdate(id, plan.data, eventRows(plan.events, { proposalId: id }, now))
+      return toAdmin(updated, env.RESPONSE_HOURS, now)
+    },
+
+    async logContact(id: string, body: LeadContactBodyT, actorName: string | null = null): Promise<AdminProposal> {
+      const existing = await repo.findById(id)
+      if (!existing) throw notFound('Proposal')
+      const now = new Date()
+      const plan = planLeadContact(existing, body, now, actorName)
+      const updated = await repo.applyLifecycleUpdate(id, plan.data, eventRows(plan.events, { proposalId: id }, now))
+      return toAdmin(updated, env.RESPONSE_HOURS, now)
     },
 
     /** Deletes the proposal, its Media row and the stored file. */
@@ -336,7 +430,11 @@ export function createProposalsService(deps: AppDeps) {
     },
 
     async exportCsv(filters: ProposalFilters): Promise<string> {
-      const rows = await repo.listForExport(buildWhere(filters))
+      const rows = await repo.listForExport(
+        buildWhere(filters, { responseHours: env.RESPONSE_HOURS }),
+        10_000,
+        leadOrder(filters),
+      )
       return toCsv(
         [
           'Reference', 'Received (UTC)', 'Status', 'Company', 'Contact person', 'Email', 'Phone', 'Group size',

@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { adminErrorResponses, errorResponses, IdParams } from '@/lib/schemas'
 import {
   AdminInquiriesQuery,
+  AdminInquiryCreateBody,
   AdminInquiryList,
   AdminInquirySchema,
   InquiryBody,
@@ -11,6 +12,7 @@ import {
 } from './inquiries.schemas'
 import { createInquiriesService } from './inquiries.service'
 import { csvFilename } from './lead-helpers'
+import { LeadContactBody } from './lead-schemas'
 
 /** POST /api/v1/inquiries */
 export const inquiriesPublicRoutes: FastifyPluginAsyncZod = async (app) => {
@@ -46,6 +48,19 @@ export const inquiriesAdminRoutes: FastifyPluginAsyncZod = async (app) => {
     { schema: { tags, security, summary: 'List inquiries (newest first) with status counts', querystring: AdminInquiriesQuery, response: { 200: AdminInquiryList, ...adminErrorResponses } } },
     async (req) => service.adminList(req.query),
   )
+  app.post(
+    '/inquiries',
+    {
+      schema: {
+        tags,
+        security,
+        summary: 'Log a manual inquiry or booking (WhatsApp, phone, referral…)',
+        body: AdminInquiryCreateBody,
+        response: { 201: AdminInquirySchema, ...adminErrorResponses },
+      },
+    },
+    async (req, reply) => reply.status(201).send(await service.adminCreate(req.body, req.admin?.name ?? null)),
+  )
   app.get(
     '/inquiries/export.csv',
     {
@@ -73,8 +88,13 @@ export const inquiriesAdminRoutes: FastifyPluginAsyncZod = async (app) => {
   )
   app.patch(
     '/inquiries/:id',
-    { schema: { tags, security, summary: 'Update status and/or internal notes', params: IdParams, body: InquiryUpdateBody, response: { 200: AdminInquirySchema, ...adminErrorResponses } } },
-    async (req) => service.update(req.params.id, req.body),
+    { schema: { tags, security, summary: 'Update status, follow-up, booking dates and/or internal notes', params: IdParams, body: InquiryUpdateBody, response: { 200: AdminInquirySchema, ...adminErrorResponses } } },
+    async (req) => service.update(req.params.id, req.body, req.admin?.name ?? null),
+  )
+  app.post(
+    '/inquiries/:id/contacts',
+    { schema: { tags, security, summary: 'Log a contact with the guest (moves "new" to "replied")', params: IdParams, body: LeadContactBody, response: { 200: AdminInquirySchema, ...adminErrorResponses } } },
+    async (req) => service.logContact(req.params.id, req.body, req.admin?.name ?? null),
   )
   app.delete(
     '/inquiries/:id',

@@ -1,12 +1,16 @@
 import type { z } from 'zod'
 import type { AppDeps } from '@/types'
 import type { Prisma } from '@/generated/prisma/client'
+import { guideReviewEmail } from '@/lib/email/templates'
 import { tr } from '@/lib/i18n'
 import { notFound, validationError } from '@/lib/errors'
 import { pageMeta, toSkipTake } from '@/lib/pagination'
 import { iso } from '@/lib/dates'
 import { Tags } from '@/lib/revalidate'
 import { verifyTurnstile } from '@/lib/turnstile'
+import type { RequestContext } from '@/modules/inquiries/inquiries.service'
+import { runAfterResponse } from '@/modules/inquiries/lead-emails'
+import { siteUrl } from '@/modules/inquiries/lead-helpers'
 import { toReviewCard } from '@/modules/shared/public-dto'
 import { toAdminMediaRef, type AdminMediaRefT } from '@/modules/shared/admin-dto'
 import { createReviewsRepository, type AdminReviewRow } from './reviews.repository'
@@ -149,13 +153,13 @@ export function createReviewsService(deps: AppDeps) {
     },
 
     /** Guest submission: saved as pending for moderation; nothing is published until approved. */
-    async submit(body: ReviewSubmissionT, ip: string) {
+    async submit(body: ReviewSubmissionT, ctx: RequestContext) {
       // Honeypot filled: pretend success so bots learn nothing.
       if (body.website && body.website.trim() !== '') return { message: SUBMISSION_MESSAGE }
-      await verifyTurnstile(deps.env.TURNSTILE_SECRET, body.turnstileToken, ip)
+      await verifyTurnstile(deps.env.TURNSTILE_SECRET, body.turnstileToken, ctx.ip)
 
       const tour = body.tourSlug ? await repo.findTourBySlug(body.tourSlug) : null
-      await repo.createSubmission({
+      const created = await repo.createSubmission({
         guestName: body.guestName,
         email: body.email,
         country: body.country,
@@ -170,6 +174,28 @@ export function createReviewsService(deps: AppDeps) {
         status: 'pending',
         source: 'direct',
       })
+      const rendered = guideReviewEmail({
+        id: created.id,
+        guestName: body.guestName,
+        email: body.email,
+        country: body.country,
+        location: body.location || null,
+        travellerType: body.travellerType,
+        rating: body.rating,
+        title: body.title || null,
+        text: body.text,
+        tourTitle: tour ? tr<string>(tour.title, 'en', tour.slug) : null,
+        travelDate: body.travelDate || null,
+        locale: body.locale,
+        adminUrl: siteUrl(deps.env.FRONTEND_URL, 'en', '/admin/reviews?status=pending'),
+      })
+      runAfterResponse(ctx.log, { reviewId: created.id }, () =>
+        deps.email.send({
+          ...rendered,
+          to: deps.env.GUIDE_NOTIFY_EMAIL,
+          ...(body.email ? { replyTo: body.email } : {}),
+        }),
+      )
       return { message: SUBMISSION_MESSAGE }
     },
 

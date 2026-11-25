@@ -149,6 +149,22 @@ describe('POST /api/v1/inquiries', () => {
     await settled(row!.reference)
   })
 
+  it('the same clientRequestId twice (double click / retry) returns one inquiry and sends its emails once', async () => {
+    const before = await ctx.app.deps.prisma.inquiry.count()
+    const body = validInquiry({ clientRequestId: 'retry-test-1234abcd' })
+    const [a, b] = await Promise.all([submit(body), submit(body)])
+    const third = await submit(body)
+    expect([a.statusCode, b.statusCode, third.statusCode]).toEqual([201, 201, 201])
+    const refs = new Set([a, b, third].map((r) => r.json<{ reference: string }>().reference))
+    expect(refs.size).toBe(1)
+    expect(await ctx.app.deps.prisma.inquiry.count()).toBe(before + 1)
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(ctx.email.messages).toHaveLength(2) // guide + visitor, once
+
+    const bad = await submit(validInquiry({ clientRequestId: 'x' }))
+    expect(bad.statusCode).toBe(400)
+  })
+
   it('honeypot: pretends success but saves and sends nothing', async () => {
     const before = await ctx.app.deps.prisma.inquiry.count()
     const res = await submit(validInquiry({ website: 'http://spam.example' }))
@@ -305,5 +321,49 @@ describe('admin inquiry management', () => {
     expect(res.json<{ meta: { total: number } }>().meta.total).toBeGreaterThan(0)
     const past = await ctx.app.inject({ method: 'GET', url: '/api/v1/admin/inquiries?from=2020-01-01&to=2020-12-31', cookies: session.cookies })
     expect(past.json<{ meta: { total: number } }>().meta.total).toBe(0)
+  })
+})
+
+describe('visitor confirmation limits (anti-spam)', () => {
+  it('past the per-address limit the inquiry is saved and the guide notified, but no confirmation is sent', async () => {
+    const limited = await buildTestApp({ VISITOR_EMAILS_PER_ADDRESS_PER_DAY: '2' })
+    try {
+      const send = (n: number) =>
+        limited.app.inject({ method: 'POST', url: '/api/v1/inquiries', payload: validInquiry({ email: 'Spam.Target@example.com', name: `Visitor ${n}` }) })
+      for (const n of [1, 2, 3]) expect((await send(n)).statusCode).toBe(201)
+      await new Promise((resolve) => setTimeout(resolve, 100))
+      const toVisitor = limited.email.messages.filter((m) => String(m.to).toLowerCase() === 'spam.target@example.com')
+      const toGuide = limited.email.messages.filter((m) => m.to === limited.env.GUIDE_NOTIFY_EMAIL)
+      expect(toVisitor).toHaveLength(2)
+      expect(toGuide).toHaveLength(3)
+      const third = await limited.app.deps.prisma.inquiry.findFirst({ where: { name: 'Visitor 3' } })
+      expect(third).toMatchObject({ visitorEmailSkipped: true, emailStatus: 'sent' })
+      expect(third?.lastEmailError).toContain('anti-spam')
+    } finally {
+      await limited.close()
+    }
+  })
+})
+
+describe('admin: guide notification alerts', () => {
+  it('counts and filters inquiries whose guide email never arrived; search finds WhatsApp numbers', async () => {
+    const db = ctx.app.deps.prisma
+    const old = new Date(Date.now() - 60 * 60 * 1000)
+    const missing = await db.inquiry.create({
+      data: { reference: 'SRD-2026-9901', name: 'Not Notified', email: 'nn@example.com', whatsapp: '+61 412 345 678', interests: [], createdAt: old },
+    })
+    await db.inquiry.create({
+      data: { reference: 'SRD-2026-9902', name: 'Notified', email: 'ok@example.com', interests: [], createdAt: old, guideEmailSentAt: old },
+    })
+    const admin = (url: string) => ctx.app.inject({ method: 'GET', url: `/api/v1/admin${url}`, cookies: session.cookies })
+
+    const stats = (await admin('/stats')).json<{ emailAlerts: { inquiries: number; proposals: number } }>()
+    expect(stats.emailAlerts.inquiries).toBeGreaterThanOrEqual(1)
+
+    const list = (await admin('/inquiries?guideEmail=missing')).json<{ items: { id: string }[] }>()
+    expect(list.items.map((i) => i.id)).toContain(missing.id)
+
+    const byPhone = (await admin(`/inquiries?q=${encodeURIComponent('412 345')}`)).json<{ items: { id: string }[] }>()
+    expect(byPhone.items.map((i) => i.id)).toEqual([missing.id])
   })
 })

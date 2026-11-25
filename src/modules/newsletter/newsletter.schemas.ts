@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { LOCALES } from '@/lib/i18n'
 import { text } from '@/lib/sanitize'
 import { PageMetaSchema } from '@/lib/pagination'
-import { blankable, EmailField, HoneypotField } from '@/modules/inquiries/lead-schemas'
+import { blankable, EmailField, HoneypotField, TurnstileField } from '@/modules/inquiries/lead-schemas'
 
 // ---------------------------------------------------------------------------
 // Public (double opt-in)
@@ -14,6 +14,7 @@ export const NewsletterSubscribeBody = z
     locale: z.enum(LOCALES).default('en'),
     source: blankable(text(60), 'Where the form was shown, e.g. "footer" or "blog"'),
     website: HoneypotField,
+    turnstileToken: TurnstileField,
   })
   .meta({ id: 'NewsletterSubscribeBody' })
 

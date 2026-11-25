@@ -152,6 +152,11 @@ describe('seed', () => {
       ])
     }
     await check('/api/v1/availability')
+    // FAQs that used to be static copy on the reviews and travel guide pages
+    for (const scope of ['reviews', 'travelGuide']) {
+      const faqs = (await check(`/api/v1/faqs?scope=${scope}`)).json<{ question: string }[]>()
+      expect(faqs.length, scope).toBe(4)
+    }
     expect(sitemap.tours?.length).toBeGreaterThanOrEqual(6)
     expect(failures).toEqual([])
   })

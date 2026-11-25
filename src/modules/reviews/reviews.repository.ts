@@ -36,7 +36,7 @@ export function createReviewsRepository(prisma: PrismaClient) {
       ]),
 
     findTourBySlug: (slug: string) =>
-      prisma.tour.findFirst({ where: { slug, status: 'published' }, select: { id: true, slug: true } }),
+      prisma.tour.findFirst({ where: { slug, status: 'published' }, select: { id: true, slug: true, title: true } }),
 
     createSubmission: (data: Prisma.ReviewUncheckedCreateInput) => prisma.review.create({ data, select: { id: true } }),
 

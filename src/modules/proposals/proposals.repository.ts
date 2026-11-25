@@ -1,6 +1,10 @@
 import type { Prisma, PrismaClient } from '@/generated/prisma/client'
 import { nextReference } from '@/lib/reference'
-import { findContactWhatsapp } from '@/modules/inquiries/inquiries.repository'
+import {
+  countLeadConfirmationsSince,
+  findContactWhatsapp,
+  findEmailSettings,
+} from '@/modules/inquiries/inquiries.repository'
 import type { LeadEmailPatch } from '@/modules/inquiries/lead-emails'
 import type { LeadStatus } from '@/modules/inquiries/lead-schemas'
 
@@ -8,7 +12,13 @@ export const proposalInclude = {
   attachment: { select: { id: true, key: true, mime: true, size: true, originalName: true } },
 } satisfies Prisma.CorporateProposalInclude
 
+export const proposalDetailInclude = {
+  ...proposalInclude,
+  events: { orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 100 },
+} satisfies Prisma.CorporateProposalInclude
+
 export type ProposalRow = Prisma.CorporateProposalGetPayload<{ include: typeof proposalInclude }>
+export type ProposalDetailRow = Prisma.CorporateProposalGetPayload<{ include: typeof proposalDetailInclude }>
 
 export type ProposalCreateData = Pick<
   Prisma.CorporateProposalUncheckedCreateInput,
@@ -23,6 +33,8 @@ export type ProposalCreateData = Pick<
   | 'message'
   | 'sourcePage'
   | 'locale'
+  | 'clientRequestId'
+  | 'visitorEmailSkipped'
 >
 
 const NEWEST_FIRST = [{ createdAt: 'desc' }, { id: 'desc' }] satisfies Prisma.CorporateProposalOrderByWithRelationInput[]
@@ -50,24 +62,52 @@ export function createProposalsRepository(prisma: PrismaClient) {
         return media.id
       }),
 
-    findById: (id: string) => prisma.corporateProposal.findUnique({ where: { id }, include: proposalInclude }),
+    findById: (id: string) => prisma.corporateProposal.findUnique({ where: { id }, include: proposalDetailInclude }),
+
+    findByClientRequestId: (clientRequestId: string) =>
+      prisma.corporateProposal.findUnique({ where: { clientRequestId }, select: { id: true, reference: true } }),
+
+    countConfirmationsSince: (since: Date, email?: string) => countLeadConfirmationsSince(prisma, since, email),
 
     exists: (id: string) => prisma.corporateProposal.findUnique({ where: { id }, select: { id: true } }),
 
-    list: (where: Prisma.CorporateProposalWhereInput, skip: number, take: number) =>
+    list: (
+      where: Prisma.CorporateProposalWhereInput,
+      skip: number,
+      take: number,
+      orderBy: Prisma.CorporateProposalOrderByWithRelationInput[] = NEWEST_FIRST,
+    ) =>
       prisma.$transaction([
-        prisma.corporateProposal.findMany({ where, include: proposalInclude, orderBy: NEWEST_FIRST, skip, take }),
+        prisma.corporateProposal.findMany({ where, include: proposalInclude, orderBy, skip, take }),
         prisma.corporateProposal.count({ where }),
       ]),
 
     countByStatus: (where: Prisma.CorporateProposalWhereInput) =>
       prisma.corporateProposal.groupBy({ by: ['status'], where, _count: { _all: true } }),
 
-    listForExport: (where: Prisma.CorporateProposalWhereInput, take = 10_000) =>
-      prisma.corporateProposal.findMany({ where, include: proposalInclude, orderBy: NEWEST_FIRST, take }),
+    listForExport: (
+      where: Prisma.CorporateProposalWhereInput,
+      take = 10_000,
+      orderBy: Prisma.CorporateProposalOrderByWithRelationInput[] = NEWEST_FIRST,
+    ) => prisma.corporateProposal.findMany({ where, include: proposalInclude, orderBy, take }),
 
     update: (id: string, data: { status?: LeadStatus; internalNotes?: string | null }) =>
-      prisma.corporateProposal.update({ where: { id }, data, include: proposalInclude }),
+      prisma.corporateProposal.update({ where: { id }, data, include: proposalDetailInclude }),
+
+    applyLifecycleUpdate: (
+      id: string,
+      data: Prisma.CorporateProposalUncheckedUpdateInput,
+      events: Prisma.LeadEventCreateManyInput[],
+    ) =>
+      prisma.$transaction(async (tx) => {
+        if (Object.keys(data).length > 0) {
+          await tx.corporateProposal.update({ where: { id }, data })
+        }
+        if (events.length > 0) {
+          await tx.leadEvent.createMany({ data: events })
+        }
+        return tx.corporateProposal.findUniqueOrThrow({ where: { id }, include: proposalDetailInclude })
+      }),
 
     updateEmailState: (id: string, patch: LeadEmailPatch) =>
       prisma.corporateProposal.update({ where: { id }, data: patch }),
@@ -96,6 +136,8 @@ export function createProposalsRepository(prisma: PrismaClient) {
       }),
 
     contactWhatsapp: () => findContactWhatsapp(prisma),
+
+    emailSettings: () => findEmailSettings(prisma),
   }
 }
 

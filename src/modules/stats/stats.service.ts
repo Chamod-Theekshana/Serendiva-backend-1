@@ -41,7 +41,7 @@ export function createStatsService(deps: AppDeps) {
       const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
       const firstMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 11, 1))
 
-      const [statusGroups, thisWeek, thisMonth, months, countries, tourGroups, sourceGroups, latest, proposals, pendingReviews, newsletter] =
+      const [statusGroups, thisWeek, thisMonth, months, countries, tourGroups, sourceGroups, latest, proposals, pendingReviews, newsletter, notNotified] =
         await Promise.all([
           repo.inquiryStatusCounts(),
           repo.inquiriesSince(weekStart),
@@ -54,6 +54,7 @@ export function createStatsService(deps: AppDeps) {
           repo.proposalCounts(),
           repo.pendingReviews(),
           repo.newsletterCounts(),
+          repo.guideNotNotified(),
         ])
 
       const counts = countsFrom(statusGroups)
@@ -87,17 +88,27 @@ export function createStatsService(deps: AppDeps) {
           thisWeek,
           thisMonth,
           total: counts.total,
-          byStatus: { new: counts.new, replied: counts.replied, closed: counts.closed },
-          conversionRate: counts.total ? Math.round(((counts.replied + counts.closed) / counts.total) * 1000) / 1000 : 0,
+          byStatus: {
+            new: counts.new,
+            replied: counts.replied,
+            proposal_sent: counts.proposal_sent,
+            confirmed: counts.confirmed,
+            lost: counts.lost,
+            cancelled: counts.cancelled,
+          },
+          conversionRate: counts.total
+            ? Math.round(((counts.replied + counts.proposal_sent + counts.confirmed) / counts.total) * 1000) / 1000
+            : 0,
           byMonth,
           byCountry: countries.map((c) => ({ country: c.country, count: c.count })),
           byTour,
           bySource,
-          latest: latest.map(toAdminInquiryListItem),
+          latest: latest.map((row) => toAdminInquiryListItem(row, deps.env.RESPONSE_HOURS, now)),
         },
         proposals: { new: proposals[0], total: proposals[1] },
         reviews: { pending: pendingReviews },
         newsletter: { confirmed: newsletter[0], pending: newsletter[1] },
+        emailAlerts: { inquiries: notNotified[0], proposals: notNotified[1] },
       }
     },
   }
