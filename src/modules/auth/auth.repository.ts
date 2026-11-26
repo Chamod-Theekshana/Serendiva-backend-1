@@ -41,6 +41,47 @@ export function createAuthRepository(prisma: PrismaClient) {
         where: { userId, revokedAt: null, ...(exceptFamily ? { NOT: { family: exceptFamily } } : {}) },
         data: { revokedAt: new Date() },
       }),
-    deleteExpired: () => prisma.refreshToken.deleteMany({ where: { expiresAt: { lt: new Date() } } }),
+    findLatestActiveOtp: (userId: string, now = new Date()) =>
+      prisma.passwordResetOtp.findFirst({
+        where: { userId, usedAt: null, expiresAt: { gt: now } },
+        orderBy: { createdAt: 'desc' },
+      }),
+    replacePasswordResetOtp: (userId: string, codeHash: string, expiresAt: Date) =>
+      prisma.$transaction(async (tx) => {
+        await tx.passwordResetOtp.updateMany({
+          where: { userId, usedAt: null },
+          data: { usedAt: new Date() },
+        })
+        return tx.passwordResetOtp.create({ data: { userId, codeHash, expiresAt } })
+      }),
+    recordFailedOtpAttempt: (id: string, attempts: number, invalidate: boolean) =>
+      prisma.passwordResetOtp.update({
+        where: { id },
+        data: { attempts, ...(invalidate ? { usedAt: new Date() } : {}) },
+      }),
+    completePasswordReset: (userId: string, passwordHash: string) =>
+      prisma.$transaction(async (tx) => {
+        const now = new Date()
+        await tx.adminUser.update({
+          where: { id: userId },
+          data: { passwordHash, failedLoginCount: 0, lockedUntil: null },
+        })
+        await tx.passwordResetOtp.updateMany({
+          where: { userId, usedAt: null },
+          data: { usedAt: now },
+        })
+        await tx.refreshToken.updateMany({
+          where: { userId, revokedAt: null },
+          data: { revokedAt: now },
+        })
+      }),
+    deleteExpired: async () => {
+      const now = new Date()
+      const [tokens] = await Promise.all([
+        prisma.refreshToken.deleteMany({ where: { expiresAt: { lt: now } } }),
+        prisma.passwordResetOtp.deleteMany({ where: { expiresAt: { lt: now } } }),
+      ])
+      return tokens
+    },
   }
 }

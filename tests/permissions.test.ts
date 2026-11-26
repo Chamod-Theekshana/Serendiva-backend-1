@@ -31,8 +31,14 @@ function registeredRoutes(app: App): RegisteredRoute[] {
   return routes
 }
 
-/** Public by design: they establish or end a session. */
-const PUBLIC_AUTH = new Set(['/api/v1/admin/auth/login', '/api/v1/admin/auth/refresh', '/api/v1/admin/auth/logout'])
+/** Public by design: they establish, reset, or end a session. */
+const PUBLIC_AUTH = new Set([
+  '/api/v1/admin/auth/login',
+  '/api/v1/admin/auth/refresh',
+  '/api/v1/admin/auth/logout',
+  '/api/v1/admin/auth/forgot-password',
+  '/api/v1/admin/auth/reset-password',
+])
 
 let adminRoutes: RegisteredRoute[] = []
 
