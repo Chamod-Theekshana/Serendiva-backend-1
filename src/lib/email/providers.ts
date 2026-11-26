@@ -24,6 +24,74 @@ export function createResendProvider(apiKey: string): EmailProvider {
   }
 }
 
+interface BrevoMailbox {
+  email: string
+  name?: string
+}
+
+function parseMailbox(raw: string): BrevoMailbox {
+  const trimmed = raw.trim()
+  const match = /^(.*)<([^<>]+)>$/.exec(trimmed)
+  if (!match) return { email: trimmed }
+  const email = (match[2] ?? '').trim()
+  const name = (match[1] ?? '').trim().replace(/^["']|["']$/g, '')
+  return name ? { name, email } : { email }
+}
+
+/**
+ * Brevo Transactional Email HTTP API (port 443). Works on platforms that block outbound SMTP
+ * (such as Railway Trial/Hobby) and allows sending with a verified single sender address.
+ */
+export function createBrevoProvider(apiKey: string, fetchImpl: typeof fetch = fetch): EmailProvider {
+  return {
+    name: 'brevo',
+    async send(msg) {
+      const recipients = Array.isArray(msg.to) ? msg.to : [msg.to]
+      try {
+        const res = await fetchImpl('https://api.brevo.com/v3/smtp/email', {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            accept: 'application/json',
+            'api-key': apiKey,
+          },
+          body: JSON.stringify({
+            sender: parseMailbox(msg.from),
+            to: recipients.map(parseMailbox),
+            subject: msg.subject,
+            htmlContent: msg.html,
+            textContent: msg.text,
+            ...(msg.replyTo ? { replyTo: parseMailbox(msg.replyTo) } : {}),
+          }),
+          signal: AbortSignal.timeout(15_000),
+        })
+        const rawText = await res.text()
+        let parsed: Record<string, unknown> | null = null
+        if (rawText) {
+          try {
+            const json: unknown = JSON.parse(rawText)
+            if (typeof json === 'object' && json !== null && !Array.isArray(json)) {
+              parsed = json as Record<string, unknown>
+            }
+          } catch {
+            // non-JSON response body
+          }
+        }
+        if (!res.ok) {
+          const msgPart = typeof parsed?.message === 'string' ? parsed.message : rawText || res.statusText
+          const codePart = typeof parsed?.code === 'string' ? `${parsed.code}: ` : ''
+          throw new Error(`Brevo error: ${res.status} ${codePart}${msgPart}`.trim())
+        }
+        const messageId = typeof parsed?.messageId === 'string' ? parsed.messageId : undefined
+        return { id: messageId }
+      } catch (err) {
+        if (err instanceof Error && err.message.startsWith('Brevo error:')) throw err
+        throw new Error(`Brevo error: ${err instanceof Error ? err.message : String(err)}`)
+      }
+    },
+  }
+}
+
 export interface SmtpOptions {
   host: string
   port: number

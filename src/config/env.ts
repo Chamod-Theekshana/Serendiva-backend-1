@@ -71,8 +71,9 @@ const EnvSchema = z
     ADMIN_SEED_PASSWORD: z.string().min(10).optional(),
     ADMIN_SEED_NAME: z.string().default('Dinesh Jayasuriya'),
 
-    EMAIL_DRIVER: z.enum(['resend', 'smtp', 'console']).default('console'),
+    EMAIL_DRIVER: z.enum(['resend', 'brevo', 'smtp', 'console']).default('console'),
     RESEND_API_KEY: z.string().optional(),
+    BREVO_API_KEY: z.string().optional().transform((v) => (v ? v : undefined)),
     /** SMTP (EMAIL_DRIVER=smtp) — defaults fit Gmail with an App Password. */
     SMTP_HOST: z.string().default('smtp.gmail.com'),
     SMTP_PORT: z.coerce.number().int().positive().default(465),
@@ -126,6 +127,9 @@ const EnvSchema = z
   .superRefine((env, ctx) => {
     if (env.EMAIL_DRIVER === 'resend' && !env.RESEND_API_KEY) {
       ctx.addIssue({ code: 'custom', path: ['RESEND_API_KEY'], message: 'required when EMAIL_DRIVER=resend' })
+    }
+    if (env.EMAIL_DRIVER === 'brevo' && !env.BREVO_API_KEY) {
+      ctx.addIssue({ code: 'custom', path: ['BREVO_API_KEY'], message: 'required when EMAIL_DRIVER=brevo' })
     }
     if (env.EMAIL_DRIVER === 'smtp') {
       for (const key of ['SMTP_USER', 'SMTP_PASSWORD'] as const) {

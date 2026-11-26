@@ -1,6 +1,6 @@
 import type { FastifyBaseLogger } from 'fastify'
 import type { Env } from '@/config/env'
-import { createConsoleProvider, createResendProvider, createSmtpProvider } from './providers'
+import { createBrevoProvider, createConsoleProvider, createResendProvider, createSmtpProvider } from './providers'
 import type { EmailMessage, EmailProvider } from './types'
 
 export interface EmailService {
@@ -10,6 +10,7 @@ export interface EmailService {
 
 function providerFor(env: Env, log: FastifyBaseLogger): EmailProvider {
   if (env.EMAIL_DRIVER === 'resend' && env.RESEND_API_KEY) return createResendProvider(env.RESEND_API_KEY)
+  if (env.EMAIL_DRIVER === 'brevo' && env.BREVO_API_KEY) return createBrevoProvider(env.BREVO_API_KEY)
   if (env.EMAIL_DRIVER === 'smtp' && env.SMTP_USER && env.SMTP_PASSWORD) {
     return createSmtpProvider({
       host: env.SMTP_HOST,
