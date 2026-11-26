@@ -1,12 +1,17 @@
-import { createHmac, randomBytes, randomUUID } from 'node:crypto'
+import { createHmac, randomBytes, randomInt, randomUUID, timingSafeEqual } from 'node:crypto'
+import type { FastifyBaseLogger } from 'fastify'
 import argon2 from 'argon2'
 import type { AppDeps } from '@/types'
+import { adminPasswordResetOtpEmail } from '@/lib/email/templates'
 import { AppError, unauthorized } from '@/lib/errors'
 import { iso } from '@/lib/dates'
 import { createAuthRepository } from './auth.repository'
 
 const MAX_ATTEMPTS = 5
 const BASE_LOCK_MINUTES = 15
+const OTP_TTL_MINUTES = 10
+const OTP_COOLDOWN_MS = 60_000
+const MAX_OTP_ATTEMPTS = 5
 
 export interface IssuedTokens {
   user: { id: string; email: string; name: string; lastLoginAt: string | null }
@@ -21,6 +26,13 @@ export function createAuthService(deps: AppDeps) {
 
   /** Refresh tokens are random 384-bit strings; only an HMAC of them is stored. */
   const hashToken = (token: string) => createHmac('sha256', env.JWT_REFRESH_SECRET).update(token).digest('hex')
+  const hashOtp = (userId: string, otp: string) =>
+    createHmac('sha256', env.JWT_REFRESH_SECRET).update(`otp:${userId}:${otp}`).digest('hex')
+  const otpMatches = (expectedHash: string, userId: string, otp: string) => {
+    const a = Buffer.from(hashOtp(userId, otp), 'utf8')
+    const b = Buffer.from(expectedHash, 'utf8')
+    return a.length === b.length && timingSafeEqual(a, b)
+  }
   const newRefreshToken = () => randomBytes(48).toString('base64url')
   const refreshExpiry = () => new Date(Date.now() + env.REFRESH_TOKEN_TTL_DAYS * 86_400_000)
 
@@ -136,6 +148,43 @@ export function createAuthService(deps: AppDeps) {
       // Sign out every other device.
       const current = currentRefresh ? await repo.findRefreshToken(hashToken(currentRefresh)) : null
       await repo.revokeAllForUser(user.id, current?.family)
+    },
+
+    async requestPasswordReset(email: string, log?: FastifyBaseLogger): Promise<void> {
+      const user = await repo.findUserByEmail(email)
+      if (!user) return
+      const now = new Date()
+      const latest = await repo.findLatestActiveOtp(user.id, now)
+      if (latest && now.getTime() - latest.createdAt.getTime() < OTP_COOLDOWN_MS) return
+
+      const otp = String(randomInt(0, 1_000_000)).padStart(6, '0')
+      const expiresAt = new Date(now.getTime() + OTP_TTL_MINUTES * 60_000)
+      await repo.replacePasswordResetOtp(user.id, hashOtp(user.id, otp), expiresAt)
+
+      try {
+        await deps.email.send({
+          ...adminPasswordResetOtpEmail({ name: user.name, otp, expiresMinutes: OTP_TTL_MINUTES }),
+          to: user.email,
+        })
+      } catch (err) {
+        log?.error({ err: err instanceof Error ? err.message : String(err), adminId: user.id }, 'password reset OTP email failed')
+      }
+    },
+
+    async resetPasswordWithOtp(email: string, otp: string, newPassword: string): Promise<void> {
+      const invalidOtp = () => new AppError(400, 'INVALID_OTP', 'The verification code is invalid or has expired.')
+      const user = await repo.findUserByEmail(email)
+      if (!user) throw invalidOtp()
+      const record = await repo.findLatestActiveOtp(user.id)
+      if (!record || record.attempts >= MAX_OTP_ATTEMPTS) throw invalidOtp()
+
+      if (!otpMatches(record.codeHash, user.id, otp)) {
+        const nextAttempts = record.attempts + 1
+        await repo.recordFailedOtpAttempt(record.id, nextAttempts, nextAttempts >= MAX_OTP_ATTEMPTS)
+        throw invalidOtp()
+      }
+
+      await repo.completePasswordReset(user.id, await argon2.hash(newPassword))
     },
 
     cleanupExpired: () => repo.deleteExpired(),

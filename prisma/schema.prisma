@@ -107,9 +107,10 @@ model AdminUser {
   lastLoginAt      DateTime?
   failedLoginCount Int            @default(0)
   lockedUntil      DateTime?
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
   refreshTokens    RefreshToken[]
+  passwordResetOtps PasswordResetOtp[]
   media            Media[]
 }
 
@@ -129,6 +130,21 @@ model RefreshToken {
 
   @@index([userId])
   @@index([family])
+}
+
+model PasswordResetOtp {
+  id        String    @id @default(cuid())
+  userId    String
+  user      AdminUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// HMAC-SHA256 of "otp:<userId>:<6-digit-code>" keyed with JWT_REFRESH_SECRET.
+  codeHash  String
+  expiresAt DateTime
+  usedAt    DateTime?
+  attempts  Int       @default(0)
+  createdAt DateTime  @default(now())
+
+  @@index([userId, createdAt])
+  @@index([expiresAt])
 }
 
 // ---------------------------------------------------------------------------

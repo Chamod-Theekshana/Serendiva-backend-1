@@ -2,7 +2,15 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
 import type { FastifyReply } from 'fastify'
 import { ACCESS_COOKIE, REFRESH_COOKIE, REFRESH_COOKIE_PATH, SESSION_COOKIE } from '@/plugins/auth'
 import { adminErrorResponses, ErrorResponseSchema, OkSchema } from '@/lib/schemas'
-import { AdminUserSchema, ChangePasswordBody, LoginBody, SessionSchema, UpdateProfileBody } from './auth.schemas'
+import {
+  AdminUserSchema,
+  ChangePasswordBody,
+  ForgotPasswordBody,
+  LoginBody,
+  ResetPasswordBody,
+  SessionSchema,
+  UpdateProfileBody,
+} from './auth.schemas'
 import { createAuthService, type IssuedTokens } from './auth.service'
 
 /**
@@ -144,6 +152,42 @@ const authRoutes: FastifyPluginAsyncZod = async (app) => {
         req.body.newPassword,
         req.cookies[REFRESH_COOKIE],
       )
+      return { ok: true as const }
+    },
+  )
+
+  app.post(
+    '/forgot-password',
+    {
+      config: { rateLimit: { max: 5, timeWindow: '15 minutes' } },
+      schema: {
+        tags: ['Admin · Auth'],
+        summary: 'Request a 6-digit password reset OTP email',
+        body: ForgotPasswordBody,
+        response: { 200: OkSchema, 400: ErrorResponseSchema, 429: ErrorResponseSchema },
+      },
+    },
+    async (req) => {
+      await service.requestPasswordReset(req.body.email, req.log)
+      return { ok: true as const }
+    },
+  )
+
+  app.post(
+    '/reset-password',
+    {
+      config: { rateLimit: { max: 10, timeWindow: '15 minutes' } },
+      schema: {
+        tags: ['Admin · Auth'],
+        summary: 'Reset admin password using the email OTP',
+        body: ResetPasswordBody,
+        response: { 200: OkSchema, 400: ErrorResponseSchema, 429: ErrorResponseSchema },
+      },
+    },
+    async (req, reply) => {
+      await service.resetPasswordWithOtp(req.body.email, req.body.otp, req.body.newPassword)
+      clearSessionCookies(reply)
+      req.log.info('admin password reset via OTP')
       return { ok: true as const }
     },
   )

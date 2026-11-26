@@ -430,3 +430,28 @@ export function guideFollowUpDigestEmail(d: FollowUpDigestData): RenderedEmail {
     text: `Daily Serendiva reminder (${d.dateIso})\n${total} open lead${total === 1 ? '' : 's'} need attention:\n\n${textSections.join('\n\n')}\n\nDashboard: ${d.adminDashboardUrl}`,
   }
 }
+
+export function adminPasswordResetOtpEmail(d: {
+  name: string
+  otp: string
+  expiresMinutes: number
+}): RenderedEmail {
+  const expiryLabel = d.expiresMinutes === 1 ? '1 minute' : `${d.expiresMinutes} minutes`
+  return {
+    subject: `Serendiva Admin — password reset code (${d.otp})`,
+    html: layout({
+      preheader: `Your admin password reset code is ${d.otp} (expires in ${expiryLabel})`,
+      title: 'Reset your admin password',
+      body:
+        p(`Hello ${esc(d.name)},`) +
+        p('Use the verification code below to reset the password for your Serendiva Admin account:') +
+        `<div style="background:${brand.surface};border-left:3px solid ${brand.gold};padding:16px 20px;margin:0 0 18px;border-radius:6px;text-align:center;">` +
+        `<div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:${brand.muted}">Verification code</div>` +
+        `<div style="font-size:32px;font-weight:bold;letter-spacing:8px;color:${brand.primary};margin-top:6px;font-family:'Courier New',Courier,monospace;">${esc(d.otp)}</div>` +
+        `</div>` +
+        p(`This code expires in <strong>${esc(expiryLabel)}</strong> and can only be used once.`) +
+        p(`<span style="font-size:13px;color:${brand.muted}">If you didn't request a password reset, you can safely ignore this email.</span>`),
+    }),
+    text: `Hello ${d.name},\n\nYour Serendiva Admin password reset code is: ${d.otp}\n\nThis code expires in ${expiryLabel} and can only be used once.\n\nIf you didn't request a password reset, you can safely ignore this email.`,
+  }
+}
